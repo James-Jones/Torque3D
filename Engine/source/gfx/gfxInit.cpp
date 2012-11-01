@@ -196,7 +196,7 @@ GFXAdapter* GFXInit::chooseAdapter( GFXAdapterType type)
 
 const char* GFXInit::getAdapterNameFromType(GFXAdapterType type)
 {
-   static const char* _names[] = { "OpenGL", "D3D9", "D3D8", "NullDevice", "Xenon" };
+   static const char* _names[] = { "OpenGL", "D3D9", "D3D8", "NullDevice", "Xenon", "D3D11" };
    
    if( type < 0 || type >= GFXAdapterType_Count )
    {

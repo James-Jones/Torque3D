@@ -381,7 +381,7 @@ void GFXD3D11Device::enumerateAdapters( Vector<GFXAdapter*> &adapterList )
 
         // Get the device description string.
 
-		wcstombs(toAdd->mName, sAdapterDesc.Description, wcslen(sAdapterDesc.Description) );
+		wcstombs(toAdd->mName, sAdapterDesc.Description, GFXAdapter::MaxAdapterNameLen );
         dStrncat(toAdd->mName, " (D3D11)", GFXAdapter::MaxAdapterNameLen);
 
         // Video mode enumeration.
