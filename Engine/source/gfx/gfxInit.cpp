@@ -80,6 +80,9 @@ inline static void _GFXInitReportAdapters(Vector<GFXAdapter*> &adapters)
       case Direct3D8:
          Con::printf("   Direct 3D (version 8.1) device found");
          break;
+      case Direct3D11:
+         Con::printf("   Direct 3D (version 11) device found");
+         break;
       default :
          Con::printf("   Unknown device found");
          break;
@@ -241,13 +244,21 @@ GFXAdapter *GFXInit::getBestAdapterChoice()
    // best choice!
    F32 highestSM9 = 0.f, highestSMGL = 0.f;
    GFXAdapter  *foundAdapter8 = NULL, *foundAdapter9 = NULL, 
-               *foundAdapterGL = NULL;
+               *foundAdapterGL = NULL, *foundAdapter11 = NULL;
 
    for(S32 i=0; i<smAdapters.size(); i++)
    {
       GFXAdapter *currAdapter = smAdapters[i];
       switch(currAdapter->mType)
       {
+      case Direct3D11:
+         if(currAdapter->mShaderModel > highestSM9)
+         {
+            highestSM11 = currAdapter->mShaderModel;
+            foundAdapter11 = currAdapter;
+         }
+         break;
+
       case Direct3D9:
          if(currAdapter->mShaderModel > highestSM9)
          {
@@ -274,7 +285,10 @@ GFXAdapter *GFXInit::getBestAdapterChoice()
       }
    }
 
-   // Return best found in order DX9, GL, DX8.
+   // Return best found in order DX11, DX9, GL, DX8.
+   if(foundAdapter11)
+      return foundAdapter11;
+
    if(foundAdapter9)
       return foundAdapter9;
 
