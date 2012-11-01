@@ -242,7 +242,7 @@ GFXAdapter *GFXInit::getBestAdapterChoice()
    //
    // If D3D is unavailable, we're not on windows, so GL is de facto the
    // best choice!
-   F32 highestSM9 = 0.f, highestSMGL = 0.f;
+   F32 highestSM9 = 0.f, highestSMGL = 0.f, highestSM11 = 0.f;
    GFXAdapter  *foundAdapter8 = NULL, *foundAdapter9 = NULL, 
                *foundAdapterGL = NULL, *foundAdapter11 = NULL;
 
@@ -287,7 +287,7 @@ GFXAdapter *GFXInit::getBestAdapterChoice()
 
    // Return best found in order DX11, DX9, GL, DX8.
    if(foundAdapter11)
-      return foundAdapter11;
+      Con::warnf( "GFXInit::getBestAdapterChoice - Ignoring D3D11 until it is supported" );
 
    if(foundAdapter9)
       return foundAdapter9;

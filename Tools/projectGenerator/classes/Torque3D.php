@@ -178,6 +178,8 @@ class Torque3D
             addProjectLibInput('Imm32.lib');
             addProjectLibInput('d3d9.lib');
             addProjectLibInput('d3dx9.lib');
+            addProjectLibInput('d3d11.lib');
+            addProjectLibInput('DXGI.lib');
             addProjectLibInput('DxErr.lib');
             addProjectLibInput('ole32.lib');
             addProjectLibInput('shell32.lib');
