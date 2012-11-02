@@ -32,8 +32,8 @@
 #include "gfx/gfxTextureManager.h"
 #include "gfx/bitmap/gBitmap.h"
 #include "core/util/safeDelete.h"
+#include "windowManager/win32/win32Window.h"
 
-#include <d3d11.h>
 #include <vector>
 
 
@@ -427,7 +427,7 @@ void GFXD3D11Device::enumerateAdapters( Vector<GFXAdapter*> &adapterList )
 
                 vmAdd.bitDepth    = ( i == 0 ? 16 : 32 ); // This will need to be changed later
                 vmAdd.fullScreen  = true;
-                vmAdd.refreshRate = mode.RefreshRate.Denominator;
+                vmAdd.refreshRate = mode.RefreshRate.Numerator;
                 vmAdd.resolution  = Point2I( mode.Width, mode.Height );
                 vmAdd.antialiasLevel = MaxSampleQualities;
 
@@ -444,8 +444,103 @@ void GFXD3D11Device::setLightInternal(U32 lightStage, const GFXLightInfo light, 
 
 }
 
+//-----------------------------------------------------------------------------
+// Setup D3D present parameters - init helper function
+//-----------------------------------------------------------------------------
+DXGI_SWAP_CHAIN_DESC GFXD3D11Device::setupSwapChainParams( const GFXVideoMode &mode, const HWND &hWnd ) const
+{
+   // Create D3D Presentation params
+   DXGI_SWAP_CHAIN_DESC sd; 
+   dMemset( &sd, 0, sizeof( sd ) );
+
+   DXGI_FORMAT fmt = DXGI_FORMAT_B8G8R8X8_UNORM; // 32 bit
+
+   if( mode.bitDepth == 16 )
+      fmt = DXGI_FORMAT_B5G6R5_UNORM;
+
+   //DWORD aalevel;
+
+   // Setup the AA flags...  If we've been ask to 
+   // disable  hardware AA then do that now.
+   /*if ( mode.antialiasLevel == 0 || Con::getBoolVariable( "$pref::Video::disableHardwareAA", false ) )
+   {
+      aalevel = 0;
+   } 
+   else 
+   {
+      aalevel = mode.antialiasLevel-1;*/
+   //}
+  
+   //_validateMultisampleParams(fmt, aatype, aalevel);
+   
+   sd.BufferDesc.Width  = mode.resolution.x;
+   sd.BufferDesc.Height = mode.resolution.y;
+   sd.BufferDesc.Format = fmt;
+   sd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+   sd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+   sd.SampleDesc.Count = 1;
+   sd.SampleDesc.Quality = 0;
+   sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+   sd.BufferCount  = 1;
+   sd.SwapEffect = DXGI_SWAP_EFFECT_DISCARD;
+   sd.OutputWindow = hWnd;
+   sd.Windowed = !mode.fullScreen;
+   sd.Flags = 0;
+
+   //d3dpp.EnableAutoDepthStencil = TRUE;
+   //d3dpp.AutoDepthStencilFormat = D3DFMT_D24S8;
+
+   //if ( smDisableVSync )
+   //   d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_IMMEDIATE;	// This does NOT wait for vsync
+
+   return sd;
+}
+
 void GFXD3D11Device::init( const GFXVideoMode &mode, PlatformWindow *window )
 {
+	AssertFatal(window, "GFXD3D11Device::init - must specify a window!");
+
+   Win32Window *win = dynamic_cast<Win32Window*>( window );
+   AssertISV( win, "GFXD3D11Device::init - got a non Win32Window window passed in! Did DX go crossplatform?" );
+
+   HWND winHwnd = win->getHWND();
+
+   DXGI_SWAP_CHAIN_DESC sd = setupSwapChainParams( mode, winHwnd );
+
+
+   HRESULT hr = E_FAIL;
+   U32 deviceFlags = 0;
+
+#ifdef TORQUE_DEBUG_RENDER
+   deviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
+
+   hr = D3D11CreateDeviceAndSwapChain(
+			NULL,					// might fail with two adapters in machine
+			D3D_DRIVER_TYPE_HARDWARE,
+			NULL, 
+			deviceFlags,
+			NULL,
+			0,
+			D3D11_SDK_VERSION,
+			&sd,
+			&mSwapChain,
+			&mD3DDevice,
+			&mFeatureLevel,
+			&mImmediateContext);
+
+   if(FAILED(hr))
+   {
+      Con::errorf("Failed to create hardware device.");
+      Platform::AlertOK("DirectX Error!", "Failed to initialize Direct3D! Make sure you have DirectX 11 installed, and "
+            "are running a graphics card that supports it.");
+      Platform::forceShutdown(1);
+   }
+
+   mSwapChain->GetBuffer(0, __uuidof( ID3D11Texture2D ), (LPVOID*)&(mBackBuffer)) ;
+   mD3DDevice->CreateRenderTargetView( mBackBuffer, NULL, &mRenderTargetView );
+   mImmediateContext->OMSetRenderTargets(1, &mRenderTargetView, NULL );
+
    mCardProfiler = new GFXD3D11CardProfiler();
    mCardProfiler->init();
 }

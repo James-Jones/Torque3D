@@ -31,6 +31,8 @@
 #include "gfx/gfxInit.h"
 #include "gfx/gfxFence.h"
 
+#include <d3d11.h>
+
 class GFXD3D11WindowTarget : public GFXWindowTarget
 {
 public:
@@ -86,6 +88,14 @@ public:
    /// Sets the video mode for the device
    virtual void setVideoMode( const GFXVideoMode &mode ) { };
 protected:
+
+   ID3D11Device *mD3DDevice;
+   IDXGISwapChain *mSwapChain;
+   ID3D11RenderTargetView *mRenderTargetView;
+   ID3D11DeviceContext *mImmediateContext;
+   D3D_FEATURE_LEVEL mFeatureLevel;
+   ID3D11Texture2D *mBackBuffer;
+
    static GFXAdapter::CreateDeviceInstanceDelegate mCreateDeviceInstance; 
 
    /// Called by GFXDevice to create a device specific stateblock
@@ -124,6 +134,9 @@ protected:
    virtual void setVertexDecl( const GFXVertexDecl *decl ) {  }
    virtual void setVertexStream( U32 stream, GFXVertexBuffer *buffer ) { }
    virtual void setVertexStreamFrequency( U32 stream, U32 frequency ) { }
+
+   /// Device helper function
+   DXGI_SWAP_CHAIN_DESC setupSwapChainParams( const GFXVideoMode &mode, const HWND &hWnd ) const;
 
 public:
    virtual GFXCubemap * createCubemap();
