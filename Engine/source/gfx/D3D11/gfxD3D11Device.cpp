@@ -34,6 +34,9 @@
 #include "core/util/safeDelete.h"
 #include "windowManager/win32/win32Window.h"
 
+#include "gfx/D3D11/gfxD3D11OcclusionQuery.h"
+
+
 #include <vector>
 
 
@@ -201,37 +204,6 @@ void GFXD3D11VertexBuffer::prepare()
 {
 }
 
-class GFXD3D11PrimitiveBuffer : public GFXPrimitiveBuffer
-{
-private:
-   U16* temp;
-public:
-   GFXD3D11PrimitiveBuffer( GFXDevice *device, 
-                           U32 indexCount, 
-                           U32 primitiveCount, 
-                           GFXBufferType bufferType ) :
-      GFXPrimitiveBuffer(device, indexCount, primitiveCount, bufferType), temp( NULL ) {};
-
-   virtual void lock(U32 indexStart, U32 indexEnd, void **indexPtr); ///< locks this primitive buffer for writing into
-   virtual void unlock(); ///< unlocks this primitive buffer.
-   virtual void prepare() { };  ///< prepares this primitive buffer for use on the device it was allocated on
-
-   virtual void zombify() {}
-   virtual void resurrect() {}
-};
-
-void GFXD3D11PrimitiveBuffer::lock(U32 indexStart, U32 indexEnd, void **indexPtr)
-{
-   temp = new U16[indexEnd - indexStart];
-   *indexPtr = temp;
-}
-
-void GFXD3D11PrimitiveBuffer::unlock() 
-{
-   delete[] temp;
-   temp = NULL;
-}
-
 //
 // GFXD3D11StateBlock
 //
@@ -285,11 +257,69 @@ GFXVertexBuffer *GFXD3D11Device::allocVertexBuffer( U32 numVerts,
    return new GFXD3D11VertexBuffer(GFX, numVerts, vertexFormat, vertSize, bufferType);
 }
 
-GFXPrimitiveBuffer *GFXD3D11Device::allocPrimitiveBuffer( U32 numIndices, 
-                                                         U32 numPrimitives, 
-                                                         GFXBufferType bufferType) 
+//-----------------------------------------------------------------------------
+// allocPrimitiveBuffer
+//-----------------------------------------------------------------------------
+GFXPrimitiveBuffer * GFXD3D11Device::allocPrimitiveBuffer(   U32 numIndices, 
+                                                            U32 numPrimitives, 
+                                                            GFXBufferType bufferType )
 {
-   return new GFXD3D11PrimitiveBuffer(GFX, numIndices, numPrimitives, bufferType);
+   // Allocate a buffer to return
+   GFXD3D11PrimitiveBuffer * res = new GFXD3D11PrimitiveBuffer(this, numIndices, numPrimitives, bufferType);
+
+   U32 bytesPerIndex = 4;
+   if(bufferType == GFXIndexFormat16)
+      bytesPerIndex = 2;
+
+   D3D11_BUFFER_DESC bufferDesc;
+   bufferDesc.ByteWidth       = bytesPerIndex * numIndices;
+   bufferDesc.BindFlags       = D3D11_BIND_INDEX_BUFFER;
+   bufferDesc.CPUAccessFlags  = 0;
+   bufferDesc.MiscFlags       = 0;
+
+
+   // Assumptions:
+   //    - static buffers are write once, use many
+   //    - dynamic buffers are write many, use many
+   //    - volatile buffers are write once, use once
+   // You may never read from a buffer.
+   //Currently using d3d-dynamic usage for all bufers because
+   //torque only uses map/unmap. This should be changed.
+   switch(bufferType)
+   {
+   case GFXBufferTypeStatic:
+      bufferDesc.Usage = D3D11_USAGE_DYNAMIC;//Should be D3D11_USAGE_IMMUTABLE;
+      break;
+   case GFXBufferTypeDynamic:
+      bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+      break;
+   case GFXBufferTypeVolatile:
+      bufferDesc.Usage = D3D11_USAGE_DYNAMIC;//Should be either DEFAULT or IMMUTABLE.
+      break;
+   }
+
+   // Register resource
+   res->registerResourceWithDevice(this);
+
+   // Create d3d index buffer
+   if(bufferType == GFXBufferTypeVolatile)
+   {
+      // Get it from the pool if it's a volatile...
+      AssertFatal( numIndices < MAX_DYNAMIC_INDICES, "Cannot allocate that many indices in a volatile buffer, increase MAX_DYNAMIC_INDICES." );
+
+      res->ib              = mDynamicPB->ib;
+      // mDynamicPB->ib->AddRef();
+      res->mVolatileBuffer = mDynamicPB;
+   }
+   else
+   {
+      // Otherwise, get it as a seperate buffer...
+      D3D11Assert(mD3DDevice->CreateBuffer( &bufferDesc, NULL, &res->ib ), "Failed to allocate an index buffer.");
+      //D3D11Assert(mD3DDevice->CreateIndexBuffer( sizeof(U16) * numIndices , usage, GFXD3D9IndexFormat[GFXIndexFormat16], pool, &res->ib, 0),
+       //  "Failed to allocate an index buffer.");
+   }
+
+   return res;
 }
 
 GFXCubemap* GFXD3D11Device::createCubemap()
@@ -549,6 +579,24 @@ GFXStateBlockRef GFXD3D11Device::createStateBlockInternal(const GFXStateBlockDes
 {
    return new GFXD3D11StateBlock();
 }
+
+GFXOcclusionQuery* GFXD3D11Device::createOcclusionQuery()
+{  
+   GFXOcclusionQuery *query;
+
+   query = new GFXD3D11OcclusionQuery( this );    
+
+   query->registerResourceWithDevice(this);
+   return query;
+}
+
+void GFXD3D11Device::_setPrimitiveBuffer( GFXPrimitiveBuffer *buffer ) 
+{
+   mCurrentPB = static_cast<GFXD3D11PrimitiveBuffer *>( buffer );
+
+   mImmediateContext->IASetIndexBuffer( mCurrentPB->ib, DXGI_FORMAT_R16_UINT, 0 );
+}
+
 
 //
 // Register this device with GFXInit

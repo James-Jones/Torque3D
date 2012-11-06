@@ -31,7 +31,25 @@
 #include "gfx/gfxInit.h"
 #include "gfx/gfxFence.h"
 
+#ifndef _GFXD3D11PrimitiveBuffer_H_
+#include "gfx/D3D11/gfxD3D11PrimitiveBuffer.h"
+#endif
+
 #include <d3d11.h>
+#include <DxErr.h>
+
+inline void D3D11Assert( HRESULT hr, const char *info ) 
+{
+#if defined( TORQUE_DEBUG )
+   if( FAILED( hr ) ) 
+   {
+      char buf[256];
+      dSprintf( buf, 256, "%s\n%s\n%s", DXGetErrorStringA( hr ), DXGetErrorDescriptionA( hr ), info );
+      AssertFatal( false, buf ); 
+      //      DXTrace( __FILE__, __LINE__, hr, info, true );
+   }
+#endif
+}
 
 class GFXD3D11WindowTarget : public GFXWindowTarget
 {
@@ -96,6 +114,9 @@ protected:
    D3D_FEATURE_LEVEL mFeatureLevel;
    ID3D11Texture2D *mBackBuffer;
 
+   StrongRefPtr<GFXD3D11PrimitiveBuffer> mDynamicPB;   ///< Dynamic index buffer
+   GFXD3D11PrimitiveBuffer* mCurrentPB;
+
    static GFXAdapter::CreateDeviceInstanceDelegate mCreateDeviceInstance; 
 
    /// Called by GFXDevice to create a device specific stateblock
@@ -126,20 +147,23 @@ protected:
                                                 const GFXVertexFormat *vertexFormat, 
                                                 U32 vertSize, 
                                                 GFXBufferType bufferType );
-   virtual GFXPrimitiveBuffer *allocPrimitiveBuffer(  U32 numIndices, 
-                                                      U32 numPrimitives, 
-                                                      GFXBufferType bufferType );
+
 
    virtual GFXVertexDecl* allocVertexDecl( const GFXVertexFormat *vertexFormat ) { return NULL; }
    virtual void setVertexDecl( const GFXVertexDecl *decl ) {  }
    virtual void setVertexStream( U32 stream, GFXVertexBuffer *buffer ) { }
    virtual void setVertexStreamFrequency( U32 stream, U32 frequency ) { }
 
+   virtual void _setPrimitiveBuffer( GFXPrimitiveBuffer *buffer );
+
    /// Device helper function
    DXGI_SWAP_CHAIN_DESC setupSwapChainParams( const GFXVideoMode &mode, const HWND &hWnd ) const;
 
 public:
    virtual GFXCubemap * createCubemap();
+
+   virtual ID3D11Device* getDevice(){ return mD3DDevice; }
+   virtual ID3D11DeviceContext* getDeviceContext(){ return mImmediateContext; }
 
    virtual F32 getFillConventionOffset() const { return 0.0f; };
 
@@ -187,10 +211,15 @@ public:
                                              bool mustblend, 
                                              bool mustfilter ) { return GFXFormatR8G8B8A8; };
 
+   virtual GFXPrimitiveBuffer *allocPrimitiveBuffer(  U32 numIndices, 
+                                                      U32 numPrimitives, 
+                                                      GFXBufferType bufferType );
+
    GFXFence *createFence() { return new GFXGeneralFence( this ); }
-   GFXOcclusionQuery* createOcclusionQuery() { return NULL; }
+   GFXOcclusionQuery* createOcclusionQuery();
    
 private:
+   friend class GFXD3D11PrimitiveBuffer;
    typedef GFXDevice Parent;
    RectI clip;
 };
