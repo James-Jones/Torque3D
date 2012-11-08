@@ -34,6 +34,7 @@
 #include "core/util/safeDelete.h"
 #include "windowManager/win32/win32Window.h"
 
+#include "gfx/D3D11/gfxD3D11QueryFence.h"
 #include "gfx/D3D11/gfxD3D11OcclusionQuery.h"
 
 
@@ -578,6 +579,13 @@ void GFXD3D11Device::init( const GFXVideoMode &mode, PlatformWindow *window )
 GFXStateBlockRef GFXD3D11Device::createStateBlockInternal(const GFXStateBlockDesc& desc)
 {
    return new GFXD3D11StateBlock();
+}
+
+GFXFence *GFXD3D11Device::createFence()
+{
+    GFXFence* fence = new GFXD3D11QueryFence( this );
+    fence->registerResourceWithDevice(this);
+    return fence;
 }
 
 GFXOcclusionQuery* GFXD3D11Device::createOcclusionQuery()

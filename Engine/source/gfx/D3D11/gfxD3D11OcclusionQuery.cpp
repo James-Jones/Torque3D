@@ -30,8 +30,6 @@
 #include "T3D/gameBase/processList.h"
 #endif
 
-#define SAFE_RELEASE(x) if(x) { x->Release(); x = NULL; } 
-
 GFXD3D11OcclusionQuery::GFXD3D11OcclusionQuery( GFXDevice *device )
  : GFXOcclusionQuery( device ), 
    mQuery( NULL )   

@@ -38,6 +38,8 @@
 #include <d3d11.h>
 #include <DxErr.h>
 
+#define SAFE_RELEASE(x) if(x) { x->Release(); x = NULL; } 
+
 inline void D3D11Assert( HRESULT hr, const char *info ) 
 {
 #if defined( TORQUE_DEBUG )
@@ -215,7 +217,7 @@ public:
                                                       U32 numPrimitives, 
                                                       GFXBufferType bufferType );
 
-   GFXFence *createFence() { return new GFXGeneralFence( this ); }
+   GFXFence *createFence();
    GFXOcclusionQuery* createOcclusionQuery();
    
 private:
