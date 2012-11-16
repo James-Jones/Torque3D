@@ -170,28 +170,6 @@ public:
 };
 
 //
-// GFXD3D11StateBlock
-//
-class GFXD3D11StateBlock : public GFXStateBlock
-{
-public:
-   /// Returns the hash value of the desc that created this block
-   virtual U32 getHashValue() const { return 0; };
-
-   /// Returns a GFXStateBlockDesc that this block represents
-   virtual const GFXStateBlockDesc& getDesc() const { return mDefaultDesc; }
-
-   //
-   // GFXResource
-   //
-   virtual void zombify() { }
-   /// When called the resource should restore all device sensitive information destroyed by zombify()
-   virtual void resurrect() { }
-private:
-   GFXStateBlockDesc mDefaultDesc;
-};
-
-//
 // GFXD3D11Device
 //
 
@@ -609,7 +587,18 @@ void GFXD3D11Device::init( const GFXVideoMode &mode, PlatformWindow *window )
 
 GFXStateBlockRef GFXD3D11Device::createStateBlockInternal(const GFXStateBlockDesc& desc)
 {
-   return new GFXD3D11StateBlock();
+   return GFXStateBlockRef(new GFXD3D11StateBlock(desc, mD3DDevice, mImmediateContext));
+}
+
+/// Activates a stateblock
+void GFXD3D11Device::setStateBlockInternal(GFXStateBlock* block, bool force)
+{
+   AssertFatal(dynamic_cast<GFXD3D11StateBlock*>(block), "Incorrect stateblock type for this device!");
+   GFXD3D11StateBlock* d3dBlock = static_cast<GFXD3D11StateBlock*>(block);
+   GFXD3D11StateBlock* d3dCurrent = static_cast<GFXD3D11StateBlock*>(mCurrentStateBlock.getPointer());
+   if (force)
+      d3dCurrent = NULL;
+   d3dBlock->activate(d3dCurrent);   
 }
 
 GFXFence *GFXD3D11Device::createFence()

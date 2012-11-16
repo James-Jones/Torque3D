@@ -39,6 +39,10 @@
 #include "gfx/D3D11/gfxD3D11VertexBuffer.h"
 #endif
 
+#ifndef _GFXD3D11STATEBLOCK_H_
+#include "gfx/D3D11/gfxD3D11StateBlock.h"
+#endif
+
 #include <d3d11.h>
 #include <DxErr.h>
 
@@ -131,7 +135,7 @@ protected:
    /// Called by GFXDevice to create a device specific stateblock
    virtual GFXStateBlockRef createStateBlockInternal(const GFXStateBlockDesc& desc);
    /// Called by GFXDevice to actually set a stateblock.
-   virtual void setStateBlockInternal(GFXStateBlock* block, bool force) { };
+   virtual void setStateBlockInternal(GFXStateBlock* block, bool force);
    /// @}
 
    /// Called by base GFXDevice to actually set a const buffer
