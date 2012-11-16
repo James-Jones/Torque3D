@@ -20,8 +20,8 @@
 // IN THE SOFTWARE.
 //-----------------------------------------------------------------------------
 
-#ifndef _GFXD3D11Device_H_
-#define _GFXD3D11Device_H_
+#ifndef _GFXD3D11DEVICE_H_
+#define _GFXD3D11DEVICE_H_
 
 #include "platform/platform.h"
 
@@ -33,6 +33,10 @@
 
 #ifndef _GFXD3D11PrimitiveBuffer_H_
 #include "gfx/D3D11/gfxD3D11PrimitiveBuffer.h"
+#endif
+
+#ifndef _GFXD3D11_VERTEXBUFFER_H_
+#include "gfx/D3D11/gfxD3D11VertexBuffer.h"
 #endif
 
 #include <d3d11.h>
@@ -119,6 +123,9 @@ protected:
    StrongRefPtr<GFXD3D11PrimitiveBuffer> mDynamicPB;   ///< Dynamic index buffer
    GFXD3D11PrimitiveBuffer* mCurrentPB;
 
+   typedef StrongRefPtr<GFXD3D11VertexBuffer> RPGDVB;
+   Vector<RPGDVB> mVolatileVBList;
+
    static GFXAdapter::CreateDeviceInstanceDelegate mCreateDeviceInstance; 
 
    /// Called by GFXDevice to create a device specific stateblock
@@ -145,11 +152,6 @@ protected:
 
    virtual void setMatrix( GFXMatrixType mtype, const MatrixF &mat ) { };
 
-   virtual GFXVertexBuffer *allocVertexBuffer(  U32 numVerts, 
-                                                const GFXVertexFormat *vertexFormat, 
-                                                U32 vertSize, 
-                                                GFXBufferType bufferType );
-
 
    virtual GFXVertexDecl* allocVertexDecl( const GFXVertexFormat *vertexFormat ) { return NULL; }
    virtual void setVertexDecl( const GFXVertexDecl *decl ) {  }
@@ -157,6 +159,9 @@ protected:
    virtual void setVertexStreamFrequency( U32 stream, U32 frequency ) { }
 
    virtual void _setPrimitiveBuffer( GFXPrimitiveBuffer *buffer );
+
+   virtual GFXD3D11VertexBuffer* findVBPool( const GFXVertexFormat *vertexFormat, U32 numVertsNeeded );
+   virtual GFXD3D11VertexBuffer* createVBPool( const GFXVertexFormat *vertexFormat, U32 vertSize );
 
    /// Device helper function
    DXGI_SWAP_CHAIN_DESC setupSwapChainParams( const GFXVideoMode &mode, const HWND &hWnd ) const;
@@ -216,12 +221,20 @@ public:
    virtual GFXPrimitiveBuffer *allocPrimitiveBuffer(  U32 numIndices, 
                                                       U32 numPrimitives, 
                                                       GFXBufferType bufferType );
+   virtual GFXVertexBuffer *allocVertexBuffer(  U32 numVerts, 
+                                                const GFXVertexFormat *vertexFormat, 
+                                                U32 vertSize, 
+                                                GFXBufferType bufferType );
+   virtual void deallocVertexBuffer( GFXD3D11VertexBuffer *vertBuff );
+
+   virtual void destroyD3DResource( ID3D11Resource *d3dResource ) { SAFE_RELEASE( d3dResource ); }; 
 
    GFXFence *createFence();
    GFXOcclusionQuery* createOcclusionQuery();
    
 private:
    friend class GFXD3D11PrimitiveBuffer;
+   friend class GFXD3D11VertexBuffer;
    typedef GFXDevice Parent;
    RectI clip;
 };

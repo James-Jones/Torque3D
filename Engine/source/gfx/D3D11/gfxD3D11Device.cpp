@@ -169,42 +169,6 @@ public:
    virtual void resurrect() {}
 };
 
-class GFXD3D11VertexBuffer : public GFXVertexBuffer 
-{
-   unsigned char* tempBuf;
-public:
-   GFXD3D11VertexBuffer( GFXDevice *device, 
-                        U32 numVerts, 
-                        const GFXVertexFormat *vertexFormat, 
-                        U32 vertexSize, 
-                        GFXBufferType bufferType ) :
-      GFXVertexBuffer(device, numVerts, vertexFormat, vertexSize, bufferType) { };
-   virtual void lock(U32 vertexStart, U32 vertexEnd, void **vertexPtr);
-   virtual void unlock();
-   virtual void prepare();
-
-   virtual void zombify() {}
-   virtual void resurrect() {}
-};
-
-void GFXD3D11VertexBuffer::lock(U32 vertexStart, U32 vertexEnd, void **vertexPtr) 
-{
-   tempBuf = new unsigned char[(vertexEnd - vertexStart) * mVertexSize];
-   *vertexPtr = (void*) tempBuf;
-   lockedVertexStart = vertexStart;
-   lockedVertexEnd   = vertexEnd;
-}
-
-void GFXD3D11VertexBuffer::unlock() 
-{
-   delete[] tempBuf;
-   tempBuf = NULL;
-}
-
-void GFXD3D11VertexBuffer::prepare() 
-{
-}
-
 //
 // GFXD3D11StateBlock
 //
@@ -250,13 +214,80 @@ GFXD3D11Device::~GFXD3D11Device()
 {
 }
 
-GFXVertexBuffer *GFXD3D11Device::allocVertexBuffer( U32 numVerts, 
-                                                   const GFXVertexFormat *vertexFormat,
-                                                   U32 vertSize, 
-                                                   GFXBufferType bufferType ) 
+//-----------------------------------------------------------------------------
+// allocVertexBuffer
+//-----------------------------------------------------------------------------
+GFXVertexBuffer * GFXD3D11Device::allocVertexBuffer(   U32 numVerts, 
+                                                      const GFXVertexFormat *vertexFormat, 
+                                                      U32 vertSize, 
+                                                      GFXBufferType bufferType )
 {
-   return new GFXD3D11VertexBuffer(GFX, numVerts, vertexFormat, vertSize, bufferType);
+   PROFILE_SCOPE( GFXD3D9Device_allocVertexBuffer );
+
+   GFXD3D11VertexBuffer *res = new GFXD3D11VertexBuffer(   this, 
+                                                         numVerts, 
+                                                         vertexFormat, 
+                                                         vertSize, 
+                                                         bufferType );
+
+   res->mNumVerts = 0;
+
+   D3D11_BUFFER_DESC bufferDesc;
+   bufferDesc.ByteWidth       = vertSize * numVerts;
+   bufferDesc.BindFlags       = D3D11_BIND_VERTEX_BUFFER;
+   bufferDesc.CPUAccessFlags  = 0;
+   bufferDesc.MiscFlags       = 0;
+
+   // Assumptions:
+   //    - static buffers are write once, use many
+   //    - dynamic buffers are write many, use many
+   //    - volatile buffers are write once, use once
+   // You may never read from a buffer.
+   //Currently using d3d-dynamic usage for all bufers because
+   //torque only uses map/unmap. This should be changed.
+   switch(bufferType)
+   {
+   case GFXBufferTypeStatic:
+      bufferDesc.Usage = D3D11_USAGE_DYNAMIC;//Should be D3D11_USAGE_IMMUTABLE
+      break;
+
+   case GFXBufferTypeDynamic:
+   case GFXBufferTypeVolatile:
+      bufferDesc.Usage = D3D11_USAGE_DYNAMIC;//Should be D3D11_USAGE_DEFAULT
+      break;
+   }
+
+   res->registerResourceWithDevice(this);
+
+   // Create vertex buffer
+   if( bufferType == GFXBufferTypeVolatile )
+   {
+      // NOTE: Volatile VBs are pooled and will be allocated at lock time.
+
+      AssertFatal( numVerts <= MAX_DYNAMIC_VERTS, 
+         "GFXD3D9Device::allocVertexBuffer - Volatile vertex buffer is too big... see MAX_DYNAMIC_VERTS!" );
+   }
+   else
+   {
+      // Requesting it will allocate it.
+      vertexFormat->getDecl();
+
+      // Get a new buffer...
+      D3D11Assert(mD3DDevice->CreateBuffer( &bufferDesc, NULL, &res->vb ), "Failed to allocate VB");
+   }
+
+   res->mNumVerts = numVerts;
+   return res;
 }
+
+//-----------------------------------------------------------------------------
+// deallocate vertex buffer
+//-----------------------------------------------------------------------------
+void GFXD3D11Device::deallocVertexBuffer( GFXD3D11VertexBuffer *vertBuff )
+{
+   SAFE_RELEASE(vertBuff->vb);
+}
+
 
 //-----------------------------------------------------------------------------
 // allocPrimitiveBuffer
@@ -605,6 +636,50 @@ void GFXD3D11Device::_setPrimitiveBuffer( GFXPrimitiveBuffer *buffer )
    mImmediateContext->IASetIndexBuffer( mCurrentPB->ib, DXGI_FORMAT_R16_UINT, 0 );
 }
 
+GFXD3D11VertexBuffer* GFXD3D11Device::findVBPool( const GFXVertexFormat *vertexFormat, U32 vertsNeeded )
+{
+   PROFILE_SCOPE( GFXD3D9Device_findVBPool );
+
+   // Verts needed is ignored on the base device, 360 is different
+   for( U32 i=0; i<mVolatileVBList.size(); i++ )
+      if( mVolatileVBList[i]->mVertexFormat.isEqual( *vertexFormat ) )
+         return mVolatileVBList[i];
+
+   return NULL;
+}
+
+GFXD3D11VertexBuffer * GFXD3D11Device::createVBPool( const GFXVertexFormat *vertexFormat, U32 vertSize )
+{
+   PROFILE_SCOPE( GFXD3D9Device_createVBPool );
+
+   // this is a bit funky, but it will avoid problems with (lack of) copy constructors
+   //    with a push_back() situation
+   mVolatileVBList.increment();
+   StrongRefPtr<GFXD3D11VertexBuffer> newBuff;
+   mVolatileVBList.last() = new GFXD3D11VertexBuffer();
+   newBuff = mVolatileVBList.last();
+
+   newBuff->mNumVerts   = 0;
+   newBuff->mBufferType = GFXBufferTypeVolatile;
+   newBuff->mVertexFormat.copy( *vertexFormat );
+   newBuff->mVertexSize = vertSize;
+   newBuff->mDevice = this;
+
+   // Requesting it will allocate it.
+   vertexFormat->getDecl();
+
+   //   Con::printf("Created buff with type %x", vertFlags);
+
+   D3D11_BUFFER_DESC bufferDesc;
+   bufferDesc.ByteWidth       = vertSize * MAX_DYNAMIC_VERTS;
+   bufferDesc.BindFlags       = D3D11_BIND_VERTEX_BUFFER;
+   bufferDesc.CPUAccessFlags  = 0;
+   bufferDesc.MiscFlags       = 0;
+   bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+   D3D11Assert(mD3DDevice->CreateBuffer( &bufferDesc, NULL, &newBuff->vb ), "Failed to allocate dynamic VB");
+
+   return newBuff;
+}
 
 //
 // Register this device with GFXInit

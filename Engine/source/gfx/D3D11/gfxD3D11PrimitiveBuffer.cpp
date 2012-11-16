@@ -114,7 +114,7 @@ void GFXD3D11PrimitiveBuffer::lock(U32 indexStart, U32 indexEnd, void **indexPtr
    AssertFatal(!mLocked, "GFXD3D11PrimitiveBuffer::lock - Can't lock a primitive buffer more than once!");
    mLocked = true;
 
-   D3D11_MAP mapType;
+   D3D11_MAP mapType = D3D11_MAP_WRITE;
 
    switch(mBufferType)
    {
@@ -159,7 +159,7 @@ void GFXD3D11PrimitiveBuffer::lock(U32 indexStart, U32 indexEnd, void **indexPtr
 
    D3D11_MAPPED_SUBRESOURCE MappedResource;
 
-   D3D11Assert( ((GFXD3D11Device*)mDevice)->getDeviceContext()->Map( ib, 0, D3D11_MAP_WRITE_DISCARD, 0, &MappedResource ),
+   D3D11Assert( ((GFXD3D11Device*)mDevice)->getDeviceContext()->Map( ib, 0, mapType, 0, &MappedResource ),
       "GFXD3D11PrimitiveBuffer::lock - Could not lock primitive buffer.");
 
    //Map from indexStart * sizeof(U16) upto (indexEnd * sizeof(U16))
