@@ -888,11 +888,9 @@ bool GFXD3D11Shader::_compileShader( const Torque::Path &filePath,
    if( code != NULL )
    {
       #ifndef TORQUE_SHIPPING
-	AssertFatal(0, "Not implemented");
-#if 0
-         LPD3DXBUFFER disassem = NULL;
-         D3DXDisassembleShader( (DWORD*)code->GetBufferPointer(), false, NULL, &disassem );
-         mDissasembly = (const char*)disassem->GetBufferPointer();         
+         ID3DBlob* disassem = NULL;
+         D3DDisassemble(code->GetBufferPointer(), code->GetBufferSize(), 0, 0, &disassem);
+         mDissasembly = (const char*)disassem->GetBufferPointer(); 
          SAFE_RELEASE( disassem );
 
          if ( gDisassembleAllShaders )
@@ -908,7 +906,6 @@ bool GFXD3D11Shader::_compileShader( const Torque::Path &filePath,
                delete fstream;   
             }
          }
-#endif
       #endif
 
       if (target.compare("ps_", 3) == 0)
