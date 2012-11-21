@@ -824,8 +824,6 @@ bool GFXD3D11Shader::_compileShader( const Torque::Path &filePath,
    // Is it a precompiled obj shader?
    else if ( filePath.getExtension().equal( sOBJStr, String::NoCase ) )
    {
-	AssertFatal(0, "Not implemented");
-#if 0
       FileStream  s;
       if(!s.open(filePath, Torque::FS::File::Read))
       {
@@ -838,16 +836,9 @@ bool GFXD3D11Shader::_compileShader( const Torque::Path &filePath,
          return false;
       }
 
-      res = GFXD3DX.D3DXCreateBuffer(s.getStreamSize(), &code);
-      AssertISV(res == D3D_OK, "Unable to create buffer!");
+      res = D3DCreateBlob(s.getStreamSize(), &code);
+      AssertISV(res == S_OK, "Unable to create buffer!");
       s.read(s.getStreamSize(), code->GetBufferPointer());
-      
-      if (res == D3D_OK)
-      {
-         DWORD* data = (DWORD*) code->GetBufferPointer();
-         res = GFXD3DX.D3DXGetShaderConstantTable(data, &table);
-      }
-#endif
    }
    else
    {
