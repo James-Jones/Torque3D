@@ -39,6 +39,7 @@
 #include "gfx/D3D11/gfxD3D11EnumTranslate.h"
 #include "gfx/D3D11/gfxD3D11Cubemap.h"
 #include "gfx/D3D11/gfxD3D11TextureObject.h"
+#include "gfx/D3D11/gfxD3D11TextureManager.h"
 
 #include <vector>
 
@@ -72,62 +73,6 @@ public:
    };
 };
 
-class GFXD3D11TextureManager : public GFXTextureManager
-{
-protected:
-      virtual GFXTextureObject *_createTextureObject( U32 height, 
-                                                      U32 width, 
-                                                      U32 depth, 
-                                                      GFXFormat format, 
-                                                      GFXTextureProfile *profile, 
-                                                      U32 numMipLevels, 
-                                                      bool forceMips = false, 
-                                                      S32 antialiasLevel = 0, 
-                                                      GFXTextureObject *inTex = NULL )
-      { 
-         GFXD3D11TextureObject *retTex;
-         if ( inTex )
-         {
-            AssertFatal( dynamic_cast<GFXD3D11TextureObject*>( inTex ), "GFXD3D11TextureManager::_createTexture() - Bad inTex type!" );
-            retTex = static_cast<GFXD3D11TextureObject*>( inTex );
-         }      
-         else
-         {
-            retTex = new GFXD3D11TextureObject( GFX, profile );
-            retTex->registerResourceWithDevice( GFX );
-         }
-
-         SAFE_DELETE( retTex->mBitmap );
-         retTex->mBitmap = new GBitmap(width, height);
-         return retTex;
-      };
-
-      /// Load a texture from a proper DDSFile instance.
-      virtual bool _loadTexture(GFXTextureObject *texture, DDSFile *dds){ return true; };
-
-      /// Load data into a texture from a GBitmap using the internal API.
-      virtual bool _loadTexture(GFXTextureObject *texture, GBitmap *bmp){ return true; };
-
-      /// Load data into a texture from a raw buffer using the internal API.
-      ///
-      /// Note that the size of the buffer is assumed from the parameters used
-      /// for this GFXTextureObject's _createTexture call.
-      virtual bool _loadTexture(GFXTextureObject *texture, void *raw){ return true; };
-
-      /// Refresh a texture using the internal API.
-      virtual bool _refreshTexture(GFXTextureObject *texture){ return true; };
-
-      /// Free a texture (but do not delete the GFXTextureObject) using the internal
-      /// API.
-      ///
-      /// This is only called during zombification for textures which need it, so you
-      /// don't need to do any internal safety checks.
-      virtual bool _freeTexture(GFXTextureObject *texture, bool zombify=false) { return true; };
-
-      virtual U32 _getTotalVideoMemory() { return 0; };
-      virtual U32 _getFreeVideoMemory() { return 0; };
-};
-
 //
 // GFXD3D11Device
 //
@@ -141,7 +86,6 @@ GFXD3D11Device::GFXD3D11Device()
 {
    clip.set(0, 0, 800, 800);
 
-   mTextureManager = new GFXD3D11TextureManager();
    gScreenShot = new ScreenShot();
    mCardProfiler = new GFXD3D11CardProfiler();
    mCardProfiler->init();
@@ -547,6 +491,8 @@ void GFXD3D11Device::init( const GFXVideoMode &mode, PlatformWindow *window )
 
    mCardProfiler = new GFXD3D11CardProfiler();
    mCardProfiler->init();
+
+   mTextureManager = new GFXD3D11TextureManager(mD3DDevice);
 }
 
 GFXStateBlockRef GFXD3D11Device::createStateBlockInternal(const GFXStateBlockDesc& desc)

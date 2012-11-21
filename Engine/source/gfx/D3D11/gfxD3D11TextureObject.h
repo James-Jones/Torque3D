@@ -31,6 +31,10 @@
 #include "gfx/gfxTextureManager.h"
 #endif
 
+struct ID3D11Resource;
+struct ID3D11Texture2D;
+struct ID3D11Texture3D;
+class GFXD3D11Device;
 
 class GFXD3D11TextureObject : public GFXTextureObject
 {

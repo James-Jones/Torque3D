@@ -22,13 +22,8 @@
 
 #include "gfx/D3D11/gfxD3D11Device.h"
 #include "gfx/D3D11/gfxD3D11TextureObject.h"
+#include "gfx/D3D11/gfxD3D11TextureManager.h"
 #include "platform/profiler.h"
-
-#ifdef TORQUE_OS_XENON
-#include "gfx/D3D11/360/gfx360Device.h"
-#include "gfx/D3D11/360/gfx360Target.h"
-#include "gfx/D3D11/gfxD3D11EnumTranslate.h"
-#endif
 
 U32 GFXD3D11TextureObject::mTexCount = 0;
 
@@ -160,8 +155,7 @@ void GFXD3D11TextureObject::resurrect()
    if(isManaged)
       return;
 
-AssertFatal(0, "D3D11 texture manager not implemented");
-   //static_cast<GFXD3D11TextureManager*>(TEXMGR)->refreshTexture(this);
+   static_cast<GFXD3D11TextureManager*>(TEXMGR)->refreshTexture(this);
 }
 
 //------------------------------------------------------------------------------
