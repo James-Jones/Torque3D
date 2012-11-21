@@ -38,6 +38,7 @@
 #include "gfx/D3D11/gfxD3D11OcclusionQuery.h"
 #include "gfx/D3D11/gfxD3D11EnumTranslate.h"
 #include "gfx/D3D11/gfxD3D11Cubemap.h"
+#include "gfx/D3D11/gfxD3D11TextureObject.h"
 
 #include <vector>
 
@@ -70,29 +71,6 @@ public:
       Parent::init(); // other code notes that not calling this is "BAD".
    };
 };
-
-class GFXD3D11TextureObject : public GFXTextureObject 
-{
-public:
-   GFXD3D11TextureObject(GFXDevice * aDevice, GFXTextureProfile *profile); 
-   ~GFXD3D11TextureObject() { kill(); };
-
-   virtual void pureVirtualCrash() { };
-
-   virtual GFXLockedRect * lock( U32 mipLevel = 0, RectI *inRect = NULL ) { return NULL; };
-   virtual void unlock( U32 mipLevel = 0) {};
-   virtual bool copyToBmp(GBitmap *) { return false; };
-
-   virtual void zombify() {}
-   virtual void resurrect() {}
-};
-
-GFXD3D11TextureObject::GFXD3D11TextureObject(GFXDevice * aDevice, GFXTextureProfile *profile) :
-   GFXTextureObject(aDevice, profile) 
-{
-   mProfile = profile;
-   mTextureSize.set( 0, 0, 0 );
-}
 
 class GFXD3D11TextureManager : public GFXTextureManager
 {
