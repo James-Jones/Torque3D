@@ -36,7 +36,8 @@
 
 #include "gfx/D3D11/gfxD3D11QueryFence.h"
 #include "gfx/D3D11/gfxD3D11OcclusionQuery.h"
-
+#include "gfx/D3D11/gfxD3D11EnumTranslate.h"
+#include "gfx/D3D11/gfxD3D11Cubemap.h"
 
 #include <vector>
 
@@ -149,26 +150,6 @@ protected:
       virtual U32 _getFreeVideoMemory() { return 0; };
 };
 
-class GFXD3D11Cubemap : public GFXCubemap
-{
-   friend class GFXDevice;
-private:
-   // should only be called by GFXDevice
-   virtual void setToTexUnit( U32 tuNum ) { };
-
-public:
-   virtual void initStatic( GFXTexHandle *faces ) { };
-   virtual void initStatic( DDSFile *dds ) { };
-   virtual void initDynamic( U32 texSize, GFXFormat faceFormat = GFXFormatR8G8B8A8 ) { };
-   virtual U32 getSize() const { return 0; }
-   virtual GFXFormat getFormat() const { return GFXFormatR8G8B8A8; }
-
-   virtual ~GFXD3D11Cubemap(){};
-
-   virtual void zombify() {}
-   virtual void resurrect() {}
-};
-
 //
 // GFXD3D11Device
 //
@@ -186,6 +167,9 @@ GFXD3D11Device::GFXD3D11Device()
    gScreenShot = new ScreenShot();
    mCardProfiler = new GFXD3D11CardProfiler();
    mCardProfiler->init();
+
+   // Set up the Enum translation tables
+   GFXD3D11EnumTranslate::init();
 }
 
 GFXD3D11Device::~GFXD3D11Device()
@@ -334,7 +318,9 @@ GFXPrimitiveBuffer * GFXD3D11Device::allocPrimitiveBuffer(   U32 numIndices,
 
 GFXCubemap* GFXD3D11Device::createCubemap()
 { 
-   return new GFXD3D11Cubemap(); 
+   GFXD3D11Cubemap* cube = new GFXD3D11Cubemap();
+   cube->registerResourceWithDevice(this);
+   return cube;
 };
 
 void GFXD3D11Device::enumerateAdapters( Vector<GFXAdapter*> &adapterList )
