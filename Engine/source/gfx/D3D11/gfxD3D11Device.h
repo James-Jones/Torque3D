@@ -200,13 +200,13 @@ public:
    virtual bool beginSceneInternal() { return true; };
    virtual void endSceneInternal() { };
 
-   virtual void drawPrimitive( GFXPrimitiveType primType, U32 vertexStart, U32 primitiveCount ) { };
+   virtual void drawPrimitive( GFXPrimitiveType primType, U32 vertexStart, U32 primitiveCount );
    virtual void drawIndexedPrimitive(  GFXPrimitiveType primType, 
                                        U32 startVertex, 
                                        U32 minIndex, 
                                        U32 numVerts, 
                                        U32 startIndex, 
-                                       U32 primitiveCount ) { };
+                                       U32 primitiveCount );
 
    virtual void setClipRect( const RectI &rect ) { };
    virtual const RectI &getClipRect() const { return clip; };

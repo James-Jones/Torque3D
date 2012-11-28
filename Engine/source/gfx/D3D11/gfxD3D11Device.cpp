@@ -53,7 +53,7 @@ private:
 public:
 
    ///
-   virtual const String &getRendererString() const { static String sRS("GFX Null Device Renderer"); return sRS; }
+   virtual const String &getRendererString() const { static String sRS("Direct3D 11 Device Renderer"); return sRS; }
 
 protected:
 
@@ -65,8 +65,8 @@ protected:
 public:
    virtual void init()
    {
-      mCardDescription = "GFX Null Device Card";
-      mChipSet = "NULL Device";
+      mCardDescription = "Direct3D 11 Device Card";
+      mChipSet = "Direct3D 11 Device";
       mVersionString = "0";
 
       Parent::init(); // other code notes that not calling this is "BAD".
@@ -533,6 +533,59 @@ void GFXD3D11Device::_setPrimitiveBuffer( GFXPrimitiveBuffer *buffer )
    mCurrentPB = static_cast<GFXD3D11PrimitiveBuffer *>( buffer );
 
    mImmediateContext->IASetIndexBuffer( mCurrentPB->ib, DXGI_FORMAT_R16_UINT, 0 );
+}
+
+void GFXD3D11Device::drawPrimitive( GFXPrimitiveType primType, U32 vertexStart, U32 primitiveCount ) 
+{
+   // This is done to avoid the function call overhead if possible
+   if( mStateDirty )
+      updateStates();
+   if (mCurrentShaderConstBuffer)
+      setShaderConstBufferInternal(mCurrentShaderConstBuffer);
+
+   //if ( mVolatileVB )
+   //   vertexStart += mVolatileVB->mVolatileStart;
+
+   D3D11Assert(primType != GFXTriangleFan, "Triangle fans not supported by D3D11");
+
+   mImmediateContext->IASetPrimitiveTopology(GFXD3D11PrimType[primType]);
+   mImmediateContext->Draw(primitiveCount, vertexStart);
+
+   mDeviceStatistics.mDrawCalls++;
+   if ( mVertexBufferFrequency[0] > 1 )
+      mDeviceStatistics.mPolyCount += primitiveCount * mVertexBufferFrequency[0];
+   else
+      mDeviceStatistics.mPolyCount += primitiveCount;
+}
+
+//-----------------------------------------------------------------------------
+
+void GFXD3D11Device::drawIndexedPrimitive( GFXPrimitiveType primType, 
+                                          U32 startVertex, 
+                                          U32 minIndex, 
+                                          U32 numVerts, 
+                                          U32 startIndex, 
+                                          U32 primitiveCount ) 
+{
+   // This is done to avoid the function call overhead if possible
+   if( mStateDirty )
+      updateStates();
+   if (mCurrentShaderConstBuffer)
+      setShaderConstBufferInternal(mCurrentShaderConstBuffer);
+
+   AssertFatal( mCurrentPB != NULL, "Trying to call drawIndexedPrimitive with no current index buffer, call setIndexBuffer()" );
+
+   //if ( mVolatileVB )
+   //   startVertex += mVolatileVB->mVolatileStart;
+
+   mImmediateContext->IASetPrimitiveTopology(GFXD3D11PrimType[primType]);
+   mImmediateContext->DrawIndexed(primitiveCount, mCurrentPB->mVolatileStart + startIndex, startVertex);
+
+   mDeviceStatistics.mDrawCalls++;
+   if ( mVertexBufferFrequency[0] > 1 )
+      mDeviceStatistics.mPolyCount += primitiveCount * mVertexBufferFrequency[0];
+   else
+      mDeviceStatistics.mPolyCount += primitiveCount;
 }
 
 GFXD3D11VertexBuffer* GFXD3D11Device::findVBPool( const GFXVertexFormat *vertexFormat, U32 vertsNeeded )

@@ -29,6 +29,7 @@
 
 
 DXGI_FORMAT GFXD3D11TextureFormat[GFXFormat_COUNT];
+D3D11_PRIMITIVE_TOPOLOGY GFXD3D11PrimType[GFXPT_COUNT];
 
 //------------------------------------------------------------------------------
 
@@ -82,5 +83,15 @@ void GFXD3D11EnumTranslate::init()
    VALIDATE_LOOKUPTABLE( GFXD3D11TextureFormat, GFXFormat);
 //------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
+
+   INIT_LOOKUPTABLE( GFXD3D11PrimType, GFXPT, D3D11_PRIMITIVE_TOPOLOGY );
+   GFXD3D11PrimType[GFXPointList] = D3D11_PRIMITIVE_TOPOLOGY_POINTLIST;
+   GFXD3D11PrimType[GFXLineList] = D3D11_PRIMITIVE_TOPOLOGY_LINELIST;
+   GFXD3D11PrimType[GFXLineStrip] = D3D11_PRIMITIVE_TOPOLOGY_LINESTRIP;
+   GFXD3D11PrimType[GFXTriangleList] = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
+   GFXD3D11PrimType[GFXTriangleStrip] = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP;
+   GFXD3D11PrimType[GFXTriangleFan] = D3D11_PRIMITIVE_TOPOLOGY_UNDEFINED;
+   VALIDATE_LOOKUPTABLE( GFXD3D11PrimType, GFXPT );
+
 }
 

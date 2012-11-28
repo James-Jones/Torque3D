@@ -34,6 +34,7 @@ namespace GFXD3D11EnumTranslate
 //------------------------------------------------------------------------------
 
 extern DXGI_FORMAT GFXD3D11TextureFormat[GFXFormat_COUNT];
+extern D3D11_PRIMITIVE_TOPOLOGY GFXD3D11PrimType[GFXPT_COUNT];
 
 #define GFXREVERSE_LOOKUP( tablearray, enumprefix, val ) \
    for( int i = enumprefix##_FIRST; i < enumprefix##_COUNT; i++ ) \
