@@ -97,7 +97,7 @@ public:
 
    static void enumerateAdapters( Vector<GFXAdapter*> &adapterList );
 
-   void init( const GFXVideoMode &mode, PlatformWindow *window = NULL );
+   virtual void init( const GFXVideoMode &mode, PlatformWindow *window = NULL );
 
    virtual void activate() { };
    virtual void deactivate() { };
@@ -181,10 +181,7 @@ public:
    ///@}
 
    virtual GFXTextureTarget *allocRenderToTextureTarget(){return NULL;};
-   virtual GFXWindowTarget *allocWindowTarget(PlatformWindow *window)
-   {
-      return new GFXD3D11WindowTarget();
-   };
+   virtual GFXWindowTarget *allocWindowTarget(PlatformWindow *window);
 
    virtual void _updateRenderTargets(){};
 

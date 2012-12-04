@@ -82,7 +82,7 @@ GFXDevice *GFXD3D11Device::createInstance( U32 adapterIndex )
    return new GFXD3D11Device();
 }
 
-GFXD3D11Device::GFXD3D11Device()
+GFXD3D11Device::GFXD3D11Device() : mD3DDevice(NULL)
 {
    clip.set(0, 0, 800, 800);
 
@@ -401,7 +401,7 @@ DXGI_SWAP_CHAIN_DESC GFXD3D11Device::setupSwapChainParams( const GFXVideoMode &m
    DXGI_SWAP_CHAIN_DESC sd; 
    dMemset( &sd, 0, sizeof( sd ) );
 
-   DXGI_FORMAT fmt = DXGI_FORMAT_B8G8R8X8_UNORM; // 32 bit
+   DXGI_FORMAT fmt = DXGI_FORMAT_B8G8R8A8_UNORM; // 32 bit
 
    if( mode.bitDepth == 16 )
       fmt = DXGI_FORMAT_B5G6R5_UNORM;
@@ -426,6 +426,8 @@ DXGI_SWAP_CHAIN_DESC GFXD3D11Device::setupSwapChainParams( const GFXVideoMode &m
    sd.BufferDesc.Format = fmt;
    sd.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
    sd.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+   sd.BufferDesc.RefreshRate.Numerator = 60;
+   sd.BufferDesc.RefreshRate.Denominator = 1;
    sd.SampleDesc.Count = 1;
    sd.SampleDesc.Quality = 0;
    sd.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
@@ -494,6 +496,16 @@ void GFXD3D11Device::init( const GFXVideoMode &mode, PlatformWindow *window )
 
    mTextureManager = new GFXD3D11TextureManager(mD3DDevice);
 }
+
+GFXWindowTarget *GFXD3D11Device::allocWindowTarget(PlatformWindow *window)
+{
+	AssertFatal(window,"GFXD3D11Device::allocWindowTarget - no window provided!");
+	if(mD3DDevice == NULL)
+	{
+		init(window->getVideoMode(), window);
+	}
+    return new GFXD3D11WindowTarget();
+};
 
 GFXStateBlockRef GFXD3D11Device::createStateBlockInternal(const GFXStateBlockDesc& desc)
 {
