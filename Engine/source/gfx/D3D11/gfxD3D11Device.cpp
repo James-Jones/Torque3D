@@ -461,6 +461,9 @@ void GFXD3D11Device::init( const GFXVideoMode &mode, PlatformWindow *window )
    HRESULT hr = E_FAIL;
    U32 deviceFlags = 0;
 
+   mMultisampleInfo.Count = sd.SampleDesc.Count;
+   mMultisampleInfo.Quality = sd.SampleDesc.Quality;
+
 #ifdef TORQUE_DEBUG_RENDER
    deviceFlags |= D3D11_CREATE_DEVICE_DEBUG;
 #endif

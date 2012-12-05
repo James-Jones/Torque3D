@@ -123,6 +123,7 @@ protected:
    ID3D11DeviceContext *mImmediateContext;
    D3D_FEATURE_LEVEL mFeatureLevel;
    ID3D11Texture2D *mBackBuffer;
+   DXGI_SAMPLE_DESC mMultisampleInfo;
 
    StrongRefPtr<GFXD3D11PrimitiveBuffer> mDynamicPB;   ///< Dynamic index buffer
    GFXD3D11PrimitiveBuffer* mCurrentPB;
@@ -232,6 +233,8 @@ public:
 
    GFXFence *createFence();
    GFXOcclusionQuery* createOcclusionQuery();
+
+   DXGI_SAMPLE_DESC getMultisampleInfo() const { return mMultisampleInfo; }
    
 private:
    friend class GFXD3D11PrimitiveBuffer;
