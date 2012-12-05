@@ -57,6 +57,8 @@ public:
    GFXD3D11TextureObject( GFXDevice * d, GFXTextureProfile *profile);
    ~GFXD3D11TextureObject();
 
+   void setTex(ID3D11Resource* resource){mD3DTexture = resource;}
+
    ID3D11Resource *    getTex(){ return mD3DTexture; }
    ID3D11Texture2D *        get2DTex(){ return (ID3D11Texture2D*) mD3DTexture; }
    ID3D11Texture2D **       get2DTexPtr(){ return (ID3D11Texture2D**) &mD3DTexture; }

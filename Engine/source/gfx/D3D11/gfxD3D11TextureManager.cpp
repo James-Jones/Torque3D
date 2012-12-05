@@ -78,7 +78,10 @@ void GFXD3D11TextureManager::_innerCreateTexture( GFXD3D11TextureObject *retTex,
    // Some relevant helper information...
    bool supportsAutoMips = GFX->getCardProfiler()->queryProfile("autoMipMapLevel", true);
    
-   DWORD usage = 0;   // 0, D3DUSAGE_RENDERTARGET, or D3DUSAGE_DYNAMIC
+   D3D11_USAGE usage = D3D11_USAGE_DYNAMIC;//Eventually this should be D3D11_USAGE_DEFAULT
+   UINT bind = D3D11_BIND_SHADER_RESOURCE;
+   UINT cpuAccess = D3D11_CPU_ACCESS_WRITE;//Eventually this should be 0
+   UINT misc = 0;
 
    retTex->mProfile = profile;
 
@@ -86,21 +89,18 @@ void GFXD3D11TextureManager::_innerCreateTexture( GFXD3D11TextureObject *retTex,
 
    if( retTex->mProfile->isDynamic() )
    {
-      //usage = D3DUSAGE_DYNAMIC;
-   }
-   else
-   {
-      usage = 0;
+      usage = D3D11_USAGE_DYNAMIC;
+	  cpuAccess |= D3D11_CPU_ACCESS_WRITE;
    }
 
    if( retTex->mProfile->isRenderTarget() )
    {
-      //usage |= D3DUSAGE_RENDERTARGET;
+     bind |= D3D11_BIND_DEPTH_STENCIL;
    }
 
    if(retTex->mProfile->isZTarget())
    {
-      //usage |= D3DUSAGE_DEPTHSTENCIL;
+      bind |= D3D11_BIND_RENDER_TARGET;
    }
 
    if( supportsAutoMips && 
@@ -109,7 +109,9 @@ void GFXD3D11TextureManager::_innerCreateTexture( GFXD3D11TextureObject *retTex,
        numMipLevels == 0 &&
        !(depth > 0) )
    {
-      //usage |= D3DUSAGE_AUTOGENMIPMAP;
+	   //TODO. Call  ID3D11DeviceContext::GenerateMips. d3d9 did it automatically.
+      misc |= D3D11_RESOURCE_MISC_GENERATE_MIPS;
+	  bind |= D3D11_BIND_RENDER_TARGET;
    }
 
    // Set the managed flag...
@@ -124,15 +126,17 @@ void GFXD3D11TextureManager::_innerCreateTexture( GFXD3D11TextureObject *retTex,
 	sTexDesc3D.Depth				= depth;
 	sTexDesc3D.MipLevels			= numMipLevels;
 	sTexDesc3D.Format				= d3dTextureFormat;
-	sTexDesc3D.Usage				= D3D11_USAGE_DEFAULT;
-	sTexDesc3D.BindFlags			= D3D11_BIND_SHADER_RESOURCE;
-	sTexDesc3D.CPUAccessFlags		= 0;
-	sTexDesc3D.MiscFlags			= 0;
+	sTexDesc3D.Usage				= usage;
+	sTexDesc3D.BindFlags			= bind;
+	sTexDesc3D.CPUAccessFlags		= cpuAccess;
+	sTexDesc3D.MiscFlags			= misc;
 
-	HRESULT hResult = mD3DDevice->CreateTexture3D(&sTexDesc3D, NULL, retTex->get3DTexPtr());
+	ID3D11Texture3D* tex3D;
+	HRESULT hResult = mD3DDevice->CreateTexture3D(&sTexDesc3D, NULL, &tex3D);
 
       D3D11Assert(hResult == S_OK, "GFXD3D11TextureManager::_createTexture - failed to create volume texture!");
 
+	  retTex->setTex(tex3D);
       retTex->mTextureSize.set( width, height, depth );
       retTex->mMipLevels = numMipLevels;
       // required for 3D texture support - John Kabus
@@ -140,107 +144,51 @@ void GFXD3D11TextureManager::_innerCreateTexture( GFXD3D11TextureObject *retTex,
    }
    else
    {
-		AssertFatal(0, "Not implemented");
-#if 0
-      // Figure out AA settings for depth and render targets
-      D3DMULTISAMPLE_TYPE mstype;
-      DWORD mslevel;
 
+	D3D11_TEXTURE2D_DESC sTexDesc2D;
+	sTexDesc2D.Width				= width;
+	sTexDesc2D.Height				= height;
+	sTexDesc2D.MipLevels			= numMipLevels;
+	sTexDesc2D.ArraySize			= 1;
+	sTexDesc2D.Format				= d3dTextureFormat;
+	sTexDesc2D.Usage				= usage;
+	sTexDesc2D.BindFlags			= bind;
+	sTexDesc2D.CPUAccessFlags		= cpuAccess;;
+	sTexDesc2D.MiscFlags			= misc;
+
+      // Figure out AA settings for depth and render targets
       switch (antialiasLevel)
       {
-         case 0 :
-            mstype = D3DMULTISAMPLE_NONE;
-            mslevel = 0;
+         case 0:
+			 sTexDesc2D.SampleDesc.Quality = 0;
+			sTexDesc2D.SampleDesc.Count = 1;
             break;
          case AA_MATCH_BACKBUFFER :
-            mstype = d3d->getMultisampleType();
-            mslevel = d3d->getMultisampleLevel();
+			 sTexDesc2D.SampleDesc = d3d->getMultisampleInfo();
             break;
          default :
             {
-               mstype = D3DMULTISAMPLE_NONMASKABLE;
-               mslevel = antialiasLevel;
+               sTexDesc2D.SampleDesc.Quality = 0;
+               sTexDesc2D.SampleDesc.Count = antialiasLevel;
 #ifdef TORQUE_DEBUG
-               DWORD MaxSampleQualities;      
-               d3d->getD3D()->CheckDeviceMultiSampleType(D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, d3dTextureFormat, FALSE, D3DMULTISAMPLE_NONMASKABLE, &MaxSampleQualities);
-               AssertFatal(mslevel < MaxSampleQualities, "Invalid AA level!");
+			   UINT numQualityLevels;
+			   mD3DDevice->CheckMultisampleQualityLevels(d3dTextureFormat, antialiasLevel, &numQualityLevels);
+			   AssertFatal(numQualityLevels, "Invalid AA level!");
 #endif
             }
             break;
       }
-     
-      bool fastCreate = true;
-      // Check for power of 2 textures - this is a problem with FX 5xxx cards
-      // with current drivers - 3/2/05
-      if( !isPow2(width) || !isPow2(height) )
-      {
-         fastCreate = false;
-      }
 
-      if(retTex->mProfile->isZTarget())
-      {
-         D3D11Assert(mD3DDevice->CreateDepthStencilSurface(width, height, d3dTextureFormat,
-            mstype, mslevel, retTex->mProfile->canDiscard(), retTex->getSurfacePtr(), NULL), "Failed to create Z surface" );
+	  ID3D11Texture2D* tex2D;
 
-         retTex->mFormat = format; // Assigning format like this should be fine.
-      }
-      else
-      {
-         // Try to create the texture directly - should gain us a bit in high
-         // performance cases where we know we're creating good stuff and we
-         // don't want to bother with D3DX - slow function.
-         HRESULT res = D3DERR_INVALIDCALL;
-         if( fastCreate )
-         {
-            res = mD3DDevice->CreateTexture(width, height, numMipLevels, usage, d3dTextureFormat, pool, retTex->get2DTexPtr(), NULL);
-         }
+	  HRESULT hResult = mD3DDevice->CreateTexture2D(&sTexDesc2D, NULL, &tex2D);
 
-         if( !fastCreate || (res != D3D_OK) )
-         {
-            D3D11Assert(
-               GFXD3DX.D3DXCreateTexture(
-               mD3DDevice,
-               width,
-               height,
-               numMipLevels,
-               usage,
-               d3dTextureFormat,
-               pool,
-               retTex->get2DTexPtr()
-               ), "GFXD3D11TextureManager::_createTexture - failed to create texture!"
-               );
-         }
+	  D3D11Assert(hResult == S_OK, "Failed to create texture");
 
-         // If this is a render target, and it wants AA or wants to match the backbuffer (for example, to share the z)
-         // Check the caps though, if we can't stretchrect between textures, use the old RT method.  (Which hopefully means
-         // that they can't force AA on us as well.)
-         if (retTex->mProfile->isRenderTarget() && mslevel != 0 && (mDeviceCaps.Caps2 && D3DDEVCAPS2_CAN_STRETCHRECT_FROM_TEXTURES))
-         {
-            D3D11Assert(mD3DDevice->CreateRenderTarget(width, height, d3dTextureFormat, 
-               mstype, mslevel, false, retTex->getSurfacePtr(), NULL),
-               "GFXD3D11TextureManager::_createTexture - unable to create render target");
-         }
-
-         // All done!
-         retTex->mMipLevels = retTex->get2DTex()->GetLevelCount();
-      }
-
-      // Get the actual size of the texture...
-      D3DSURFACE_DESC probeDesc;
-      ZeroMemory(&probeDesc, sizeof probeDesc);
-
-      if( retTex->get2DTex() != NULL )
-         D3D11Assert( retTex->get2DTex()->GetLevelDesc( 0, &probeDesc ), "Failed to get surface description");
-      else if( retTex->getSurface() != NULL )
-         D3D11Assert( retTex->getSurface()->GetDesc( &probeDesc ), "Failed to get surface description");
-
-      retTex->mTextureSize.set(probeDesc.Width, probeDesc.Height, 0);
-      
-      int fmt = probeDesc.Format;
-
-      GFXREVERSE_LOOKUP( GFXD3D11TextureFormat, GFXFormat, fmt );
-      retTex->mFormat = (GFXFormat)fmt;
-#endif
+	  retTex->setTex(tex2D);
+	  retTex->mFormat = format;
+	  retTex->mMipLevels = numMipLevels;
+	  retTex->mTextureSize.set(width, height, depth);
    }
 }
 
