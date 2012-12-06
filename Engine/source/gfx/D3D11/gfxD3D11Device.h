@@ -124,6 +124,8 @@ protected:
    D3D_FEATURE_LEVEL mFeatureLevel;
    ID3D11Texture2D *mBackBuffer;
    DXGI_SAMPLE_DESC mMultisampleInfo;
+   F32 mPixVersion;
+   U32 mNumRenderTargets;
 
    StrongRefPtr<GFXD3D11PrimitiveBuffer> mDynamicPB;   ///< Dynamic index buffer
    GFXD3D11PrimitiveBuffer* mCurrentPB;
@@ -186,10 +188,10 @@ public:
 
    virtual void _updateRenderTargets(){};
 
-   virtual F32 getPixelShaderVersion() const { return 0.0f; };
-   virtual void setPixelShaderVersion( F32 version ) { };
-   virtual U32 getNumSamplers() const { return 0; };
-   virtual U32 getNumRenderTargets() const { return 0; };
+   virtual F32 getPixelShaderVersion() const { return mPixVersion; };
+   virtual void setPixelShaderVersion( F32 version ) { mPixVersion = version;};
+   virtual U32 getNumSamplers() const { return 16; };
+   virtual U32 getNumRenderTargets() const { return mNumRenderTargets; };
 
    virtual GFXShader* createShader() { return NULL; };
 
@@ -218,7 +220,7 @@ public:
                                              const Vector<GFXFormat> &formats, 
                                              bool texture, 
                                              bool mustblend, 
-                                             bool mustfilter ) { return GFXFormatR8G8B8A8; };
+                                             bool mustfilter );
 
    virtual GFXPrimitiveBuffer *allocPrimitiveBuffer(  U32 numIndices, 
                                                       U32 numPrimitives, 

@@ -60,7 +60,15 @@ protected:
    virtual void setupCardCapabilities() { };
 
    virtual bool _queryCardCap(const String &query, U32 &foundResult){ return false; }
-   virtual bool _queryFormat(const GFXFormat fmt, const GFXTextureProfile *profile, bool &inOutAutogenMips) { inOutAutogenMips = false; return false; }
+   virtual bool _queryFormat(const GFXFormat fmt, const GFXTextureProfile *profile, bool &inOutAutogenMips) {
+      inOutAutogenMips = false;
+
+      if(GFXD3D11TextureFormat[fmt] == DXGI_FORMAT_UNKNOWN)
+      {
+         return false;
+      }
+      return true;
+   }
    
 public:
    virtual void init()
@@ -92,6 +100,15 @@ GFXD3D11Device::GFXD3D11Device() : mD3DDevice(NULL)
 
    // Set up the Enum translation tables
    GFXD3D11EnumTranslate::init();
+
+   mDeviceSwizzle32 = &Swizzles::bgra;
+   GFXVertexColor::setSwizzle( mDeviceSwizzle32 );
+
+   //There is no DXGI_FORMAT for RGB8 in d3d11.
+   mDeviceSwizzle24 = NULL;
+
+   mPixVersion = 0.0f;
+   mNumRenderTargets = 0;
 }
 
 GFXD3D11Device::~GFXD3D11Device()
@@ -190,8 +207,9 @@ GFXPrimitiveBuffer * GFXD3D11Device::allocPrimitiveBuffer(   U32 numIndices,
    D3D11_BUFFER_DESC bufferDesc;
    bufferDesc.ByteWidth       = bytesPerIndex * numIndices;
    bufferDesc.BindFlags       = D3D11_BIND_INDEX_BUFFER;
-   bufferDesc.CPUAccessFlags  = 0;
+   bufferDesc.CPUAccessFlags  = D3D11_CPU_ACCESS_WRITE;
    bufferDesc.MiscFlags       = 0;
+   bufferDesc.StructureByteStride = bytesPerIndex;
 
 
    // Assumptions:
@@ -276,112 +294,112 @@ void GFXD3D11Device::enumerateAdapters( Vector<GFXAdapter*> &adapterList )
 
    for( U32 adapterIndex = 0; adapterIndex < vAdapters.size(); adapterIndex++ ) 
    {
-       GFXAdapter *toAdd = new GFXAdapter;
-       DXGI_ADAPTER_DESC sAdapterDesc;
+      GFXAdapter *toAdd = new GFXAdapter;
+      DXGI_ADAPTER_DESC sAdapterDesc;
 
-        pAdapter = vAdapters[adapterIndex];
+      pAdapter = vAdapters[adapterIndex];
 
-        toAdd->mType  = Direct3D11;
-        toAdd->mIndex = adapterIndex;
-        toAdd->mCreateDeviceInstanceDelegate = mCreateDeviceInstance;
+      toAdd->mType  = Direct3D11;
+      toAdd->mIndex = adapterIndex;
+      toAdd->mCreateDeviceInstanceDelegate = mCreateDeviceInstance;
 
-        // Grab the shader model / feature level
-        HRESULT hr = E_FAIL;
-        D3D_FEATURE_LEVEL FeatureLevel;
+      // Grab the shader model / feature level
+      HRESULT hr = E_FAIL;
+      D3D_FEATURE_LEVEL FeatureLevel;
 
-        //Must be D3D_DRIVER_TYPE_UNKNOWN when supplying a specific adapter.
-        hr = D3D11CreateDevice(pAdapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, 0, NULL, 0,
-                               D3D11_SDK_VERSION, NULL, &FeatureLevel, NULL );
+      //Must be D3D_DRIVER_TYPE_UNKNOWN when supplying a specific adapter.
+      hr = D3D11CreateDevice(pAdapter, D3D_DRIVER_TYPE_UNKNOWN, NULL, 0, NULL, 0,
+                              D3D11_SDK_VERSION, NULL, &FeatureLevel, NULL );
 
-        if(FAILED(hr))
-        {
-            return;
-        }
+      if(FAILED(hr))
+      {
+         return;
+      }
 
-        switch(FeatureLevel)
-        {
-            case D3D_FEATURE_LEVEL_9_1:
-            case D3D_FEATURE_LEVEL_9_2:
-            case D3D_FEATURE_LEVEL_9_3:
-            {
-                toAdd->mShaderModel = 2.0;
-                break;
-            }
-            case D3D_FEATURE_LEVEL_10_0:
-            case D3D_FEATURE_LEVEL_10_1:
-            {
-                toAdd->mShaderModel = 4.0;
-                break;
-            }
-            case D3D_FEATURE_LEVEL_11_0:
-            {
-                toAdd->mShaderModel = 5.0;
-                break;
-            }
-            default:
-            {
-                toAdd->mShaderModel = 2.0;
-                break;
-            }
-        }
+      switch(FeatureLevel)
+      {
+         case D3D_FEATURE_LEVEL_9_1:
+         case D3D_FEATURE_LEVEL_9_2:
+         case D3D_FEATURE_LEVEL_9_3:
+         {
+               toAdd->mShaderModel = 2.0;
+               break;
+         }
+         case D3D_FEATURE_LEVEL_10_0:
+         case D3D_FEATURE_LEVEL_10_1:
+         {
+               toAdd->mShaderModel = 4.0;
+               break;
+         }
+         case D3D_FEATURE_LEVEL_11_0:
+         {
+               toAdd->mShaderModel = 5.0;
+               break;
+         }
+         default:
+         {
+               toAdd->mShaderModel = 2.0;
+               break;
+         }
+      }
 
-        pAdapter->GetDesc(&sAdapterDesc);
+      pAdapter->GetDesc(&sAdapterDesc);
 
-        // Get the device description string.
+      // Get the device description string.
 
-		wcstombs(toAdd->mName, sAdapterDesc.Description, GFXAdapter::MaxAdapterNameLen );
+      wcstombs(toAdd->mName, sAdapterDesc.Description, GFXAdapter::MaxAdapterNameLen );
         dStrncat(toAdd->mName, " (D3D11)", GFXAdapter::MaxAdapterNameLen);
 
-        // Video mode enumeration.
+      // Video mode enumeration.
 
-        UINT i = 0;
-        IDXGIOutput * pOutput;
-        std::vector<IDXGIOutput*> vOutputs;
-        while(pAdapter->EnumOutputs(i, &pOutput) != DXGI_ERROR_NOT_FOUND)
-        {
-            vOutputs.push_back(pOutput);
-            ++i;
-        }
+      UINT i = 0;
+      IDXGIOutput * pOutput;
+      std::vector<IDXGIOutput*> vOutputs;
+      while(pAdapter->EnumOutputs(i, &pOutput) != DXGI_ERROR_NOT_FOUND)
+      {
+         vOutputs.push_back(pOutput);
+         ++i;
+      }
 
-        //pOutput->GetDisplayModeList();
+      //pOutput->GetDisplayModeList();
 
-        Vector<DXGI_FORMAT> formats( __FILE__, __LINE__ );
-        formats.push_back( DXGI_FORMAT_B5G6R5_UNORM );    // D3DFMT_R5G6B5 - 16bit format
-        formats.push_back( DXGI_FORMAT_B8G8R8X8_UNORM );  // D3DFMT_X8R8G8B8 - 32bit format
+      Vector<DXGI_FORMAT> formats( __FILE__, __LINE__ );
+      formats.push_back( DXGI_FORMAT_B5G6R5_UNORM );    // D3DFMT_R5G6B5 - 16bit format
+      formats.push_back( DXGI_FORMAT_B8G8R8X8_UNORM );  // D3DFMT_X8R8G8B8 - 32bit format
 
-		//Only check one output at the moment
-		pOutput = vOutputs[0];
+      //Only check one output at the moment
+      pOutput = vOutputs[0];
 
-        for( S32 i = 0; i < formats.size(); i++ ) 
-        {
-            DWORD MaxSampleQualities = 1;
-            //d3d9->CheckDeviceMultiSampleType(adapterIndex, D3DDEVTYPE_HAL, formats[i], FALSE, D3DMULTISAMPLE_NONMASKABLE, &MaxSampleQualities);
-            //d3d11device->CheckMultisampleQualityLevels
+      for( S32 i = 0; i < formats.size(); i++ ) 
+      {
+         DWORD MaxSampleQualities = 1;
+         //d3d9->CheckDeviceMultiSampleType(adapterIndex, D3DDEVTYPE_HAL, formats[i], FALSE, D3DMULTISAMPLE_NONMASKABLE, &MaxSampleQualities);
+         //d3d11device->CheckMultisampleQualityLevels
 
-            //Get the number of display modes
-            U32 numModesSupported = 0;
-            pOutput->GetDisplayModeList( formats[i], DXGI_ENUM_MODES_INTERLACED, &numModesSupported, 0);
+         //Get the number of display modes
+         U32 numModesSupported = 0;
+         pOutput->GetDisplayModeList( formats[i], DXGI_ENUM_MODES_INTERLACED, &numModesSupported, 0);
 
-            //Get all the display modes
-            DXGI_MODE_DESC * pDescs = new DXGI_MODE_DESC[numModesSupported];
-            pOutput->GetDisplayModeList( formats[i], DXGI_ENUM_MODES_INTERLACED, &numModesSupported, pDescs);
+         //Get all the display modes
+         DXGI_MODE_DESC * pDescs = new DXGI_MODE_DESC[numModesSupported];
+         pOutput->GetDisplayModeList( formats[i], DXGI_ENUM_MODES_INTERLACED, &numModesSupported, pDescs);
 
-            //Convert display modes to our custom internal structure
-            for( U32 j = 0; j < numModesSupported; j++ ) 
-            {
-                DXGI_MODE_DESC mode = pDescs[j];
+         //Convert display modes to our custom internal structure
+         for( U32 j = 0; j < numModesSupported; j++ ) 
+         {
+            DXGI_MODE_DESC mode = pDescs[j];
 
-                GFXVideoMode vmAdd;
+            GFXVideoMode vmAdd;
 
-                vmAdd.bitDepth    = ( i == 0 ? 16 : 32 ); // This will need to be changed later
-                vmAdd.fullScreen  = true;
-                vmAdd.refreshRate = mode.RefreshRate.Numerator;
-                vmAdd.resolution  = Point2I( mode.Width, mode.Height );
-                vmAdd.antialiasLevel = MaxSampleQualities;
+            vmAdd.bitDepth    = ( i == 0 ? 16 : 32 ); // This will need to be changed later
+            vmAdd.fullScreen  = true;
+            vmAdd.refreshRate = mode.RefreshRate.Numerator;
+            vmAdd.resolution  = Point2I( mode.Width, mode.Height );
+            vmAdd.antialiasLevel = MaxSampleQualities;
 
-                toAdd->mAvailableModes.push_back( vmAdd );
-            }
-        }
+            toAdd->mAvailableModes.push_back( vmAdd );
+         }
+      }
 
         adapterList.push_back( toAdd );
     }
@@ -448,7 +466,7 @@ DXGI_SWAP_CHAIN_DESC GFXD3D11Device::setupSwapChainParams( const GFXVideoMode &m
 
 void GFXD3D11Device::init( const GFXVideoMode &mode, PlatformWindow *window )
 {
-	AssertFatal(window, "GFXD3D11Device::init - must specify a window!");
+   AssertFatal(window, "GFXD3D11Device::init - must specify a window!");
 
    Win32Window *win = dynamic_cast<Win32Window*>( window );
    AssertISV( win, "GFXD3D11Device::init - got a non Win32Window window passed in! Did DX go crossplatform?" );
@@ -469,18 +487,18 @@ void GFXD3D11Device::init( const GFXVideoMode &mode, PlatformWindow *window )
 #endif
 
    hr = D3D11CreateDeviceAndSwapChain(
-			NULL,					// might fail with two adapters in machine
-			D3D_DRIVER_TYPE_HARDWARE,
-			NULL, 
-			deviceFlags,
-			NULL,
-			0,
-			D3D11_SDK_VERSION,
-			&sd,
-			&mSwapChain,
-			&mD3DDevice,
-			&mFeatureLevel,
-			&mImmediateContext);
+      NULL, // might fail with two adapters in machine
+      D3D_DRIVER_TYPE_HARDWARE,
+      NULL, 
+      deviceFlags,
+      NULL,
+      0,
+      D3D11_SDK_VERSION,
+      &sd,
+      &mSwapChain,
+      &mD3DDevice,
+      &mFeatureLevel,
+      &mImmediateContext);
 
    if(FAILED(hr))
    {
@@ -494,6 +512,41 @@ void GFXD3D11Device::init( const GFXVideoMode &mode, PlatformWindow *window )
    mD3DDevice->CreateRenderTargetView( mBackBuffer, NULL, &mRenderTargetView );
    mImmediateContext->OMSetRenderTargets(1, &mRenderTargetView, NULL );
 
+   switch(mFeatureLevel)
+   {
+      case D3D_FEATURE_LEVEL_9_1:
+      case D3D_FEATURE_LEVEL_9_2:
+      {
+         mPixVersion = 2.0;
+         mNumRenderTargets = 1;
+      }
+      case D3D_FEATURE_LEVEL_9_3:
+      {
+            mPixVersion = 2.0;
+            mNumRenderTargets = 4;
+            break;
+      }
+      case D3D_FEATURE_LEVEL_10_0:
+      case D3D_FEATURE_LEVEL_10_1:
+      {
+            mPixVersion = 4.0;
+            mNumRenderTargets = 8;
+            break;
+      }
+      case D3D_FEATURE_LEVEL_11_0:
+      {
+            mPixVersion = 5.0;
+            mNumRenderTargets = 8;
+            break;
+      }
+      default:
+      {
+            mPixVersion = 2.0;
+            mNumRenderTargets = 1;
+            break;
+      }
+   }
+
    mCardProfiler = new GFXD3D11CardProfiler();
    mCardProfiler->init();
 
@@ -502,12 +555,12 @@ void GFXD3D11Device::init( const GFXVideoMode &mode, PlatformWindow *window )
 
 GFXWindowTarget *GFXD3D11Device::allocWindowTarget(PlatformWindow *window)
 {
-	AssertFatal(window,"GFXD3D11Device::allocWindowTarget - no window provided!");
-	if(mD3DDevice == NULL)
-	{
-		init(window->getVideoMode(), window);
-	}
-    return new GFXD3D11WindowTarget();
+   AssertFatal(window,"GFXD3D11Device::allocWindowTarget - no window provided!");
+   if(mD3DDevice == NULL)
+   {
+      init(window->getVideoMode(), window);
+   }
+   return new GFXD3D11WindowTarget();
 };
 
 GFXStateBlockRef GFXD3D11Device::createStateBlockInternal(const GFXStateBlockDesc& desc)
@@ -647,6 +700,23 @@ GFXD3D11VertexBuffer * GFXD3D11Device::createVBPool( const GFXVertexFormat *vert
 
    return newBuff;
 }
+
+GFXFormat GFXD3D11Device::selectSupportedFormat(  GFXTextureProfile *profile, 
+                                          const Vector<GFXFormat> &formats, 
+                                          bool texture, 
+                                          bool mustblend, 
+                                          bool mustfilter ) { 
+   
+   for(U32 i=0; i<formats.size(); i++)
+   {
+      const GFXFormat fmt = formats[i];
+      if(GFXD3D11TextureFormat[fmt] != DXGI_FORMAT_UNKNOWN)
+      {
+         return fmt;
+      }
+   }
+   return GFXFormatR8G8B8A8;
+};
 
 //
 // Register this device with GFXInit
