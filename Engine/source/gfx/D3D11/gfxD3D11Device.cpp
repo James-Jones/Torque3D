@@ -139,8 +139,7 @@ protected:
          pFactory->Release();
       }
 
-      DXGI_ADAPTER_DESC sAdapterDesc;
-      pAdapter->GetDesc(&sAdapterDesc);
+      pAdapter->GetDesc(&desc);
 
       pAdapter->Release();
    }
