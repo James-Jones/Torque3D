@@ -53,12 +53,55 @@ private:
    typedef GFXCardProfiler Parent;
 public:
 
+   GFXD3D11CardProfiler(D3D_FEATURE_LEVEL featureLevel) : mFeatureLevel(featureLevel) {
+   }
+
    ///
    virtual const String &getRendererString() const { static String sRS("Direct3D 11 Device Renderer"); return sRS; }
 
 protected:
+   D3D_FEATURE_LEVEL mFeatureLevel;
 
-   virtual void setupCardCapabilities() { };
+   virtual void setupCardCapabilities() {
+
+      switch(mFeatureLevel)
+      {
+         case D3D_FEATURE_LEVEL_9_1:
+         case D3D_FEATURE_LEVEL_9_2:
+         {
+            setCapability( "maxTextureWidth", 2048 );
+            setCapability( "maxTextureHeight", 2048 );
+            setCapability( "maxTextureSize", 2048 );
+            break;
+         }
+         case D3D_FEATURE_LEVEL_9_3:
+         {
+            setCapability( "maxTextureWidth", 4096 );
+            setCapability( "maxTextureHeight", 4096 );
+            setCapability( "maxTextureSize", 4096 );
+            break;
+         }
+         case D3D_FEATURE_LEVEL_10_0:
+         case D3D_FEATURE_LEVEL_10_1:
+         {
+            setCapability( "maxTextureWidth", 8192 );
+            setCapability( "maxTextureHeight", 8192 );
+            setCapability( "maxTextureSize", 8192 );
+            break;
+         }
+         case D3D_FEATURE_LEVEL_11_0:
+         {
+            setCapability( "maxTextureWidth", 16384 );
+            setCapability( "maxTextureHeight", 16384 );
+            setCapability( "maxTextureSize", 16384 );
+            break;
+         }
+         default:
+         {
+               break;
+         }
+      }
+   };
 
    virtual bool _queryCardCap(const String &query, U32 &foundResult){ return false; }
    virtual bool _queryFormat(const GFXFormat fmt, const GFXTextureProfile *profile, bool &inOutAutogenMips) {
@@ -70,13 +113,66 @@ protected:
       }
       return true;
    }
-   
+
+   void GetAdapterDesc(DXGI_ADAPTER_DESC& desc)
+   {
+      //Find the adapter. Since we passsed NULL to D3D11CreateDeviceAndSwapChain
+      //we should be using the first one returned by EnumAdapters.
+      IDXGIAdapter * pAdapter; 
+      IDXGIFactory* pFactory = NULL; 
+
+      // Create a DXGIFactory object.
+      if(FAILED(CreateDXGIFactory(__uuidof(IDXGIFactory) ,(void**)&pFactory)))
+      {
+         Con::errorf( "CreateDXGIFactory Failed!" );
+         Platform::messageBox(   Con::getVariable( "$appName" ),
+                                 "CreateDXGIFactory failed!\r\n"
+                                 "Please be sure you have the latest version of DirectX installed.",
+                                 MBOk, MIStop );
+         Platform::forceShutdown( -1 );
+      }
+
+      pFactory->EnumAdapters(0, &pAdapter);
+
+      if(pFactory)
+      {
+         pFactory->Release();
+      }
+
+      DXGI_ADAPTER_DESC sAdapterDesc;
+      pAdapter->GetDesc(&sAdapterDesc);
+
+      pAdapter->Release();
+   }
 public:
    virtual void init()
    {
-      mCardDescription = "Direct3D 11 Device Card";
-      mChipSet = "Direct3D 11 Device";
+      DXGI_ADAPTER_DESC adapterDesc;
+      
+      GetAdapterDesc(adapterDesc);
+
+      mCardDescription = adapterDesc.Description;
+      //http://www.pcidatabase.com/vendors.php?sort=id
+      switch(adapterDesc.VendorId)
+      {
+      case 0x163C:
+      case 0x8086:
+      case 0x8087:
+         mChipSet = "Intel";
+         break;
+      case 0x10DE:
+         mChipSet = "NVIDIA";
+         break;
+      case 0x1022:
+      case 0x1002:
+         mChipSet = "AMD";
+         break;
+      default:
+         mChipSet = "Unknown";
+         break;
+      }
       mVersionString = "0";
+      mVideoMemory = adapterDesc.DedicatedVideoMemory / 1048576;//Bytes->Mega bytes.
 
       Parent::init(); // other code notes that not calling this is "BAD".
    };
@@ -96,8 +192,6 @@ GFXD3D11Device::GFXD3D11Device() : mD3DDevice(NULL), mLastPixShader(NULL), mLast
    clip.set(0, 0, 800, 800);
 
    gScreenShot = new ScreenShot();
-   mCardProfiler = new GFXD3D11CardProfiler();
-   mCardProfiler->init();
 
    // Set up the Enum translation tables
    GFXD3D11EnumTranslate::init();
@@ -603,7 +697,7 @@ void GFXD3D11Device::init( const GFXVideoMode &mode, PlatformWindow *window )
       }
    }
 
-   mCardProfiler = new GFXD3D11CardProfiler();
+   mCardProfiler = new GFXD3D11CardProfiler(mFeatureLevel);
    mCardProfiler->init();
 
    mTextureManager = new GFXD3D11TextureManager(mD3DDevice);
