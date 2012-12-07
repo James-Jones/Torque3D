@@ -68,51 +68,51 @@ GFXD3D11StateBlock::~GFXD3D11StateBlock()
 
 static D3D11_BLEND GetBlend(GFXBlend gfxBlend)
 {
-	switch(gfxBlend)
-	{
-		case GFXBlendZero:
-		{
-			return D3D11_BLEND_ZERO;
-		}
-		case GFXBlendOne:
-		{
-			return D3D11_BLEND_ONE;
-		}
-		case GFXBlendSrcColor:
-		{
-			return D3D11_BLEND_SRC_COLOR;
-		}
-		case GFXBlendInvSrcColor:
-		{
-			return D3D11_BLEND_INV_SRC_COLOR;
-		}
-		case GFXBlendSrcAlpha:
-		{
-			return D3D11_BLEND_SRC_ALPHA;
-		}
-		case GFXBlendInvSrcAlpha:
-		{
-			return D3D11_BLEND_INV_SRC_ALPHA;
-		}
-		case GFXBlendDestAlpha:
-		{
-			return D3D11_BLEND_DEST_ALPHA;
-		}
-		case GFXBlendInvDestAlpha:
-		{
-			return D3D11_BLEND_INV_DEST_ALPHA;
-		}
-		case GFXBlendDestColor:
-		{
-			return D3D11_BLEND_DEST_COLOR;
-		}
-		case GFXBlendInvDestColor:
-		{
-			return D3D11_BLEND_INV_DEST_COLOR;
-		}
-	}
+   switch(gfxBlend)
+   {
+      case GFXBlendZero:
+      {
+         return D3D11_BLEND_ZERO;
+      }
+      case GFXBlendOne:
+      {
+         return D3D11_BLEND_ONE;
+      }
+      case GFXBlendSrcColor:
+      {
+         return D3D11_BLEND_SRC_COLOR;
+      }
+      case GFXBlendInvSrcColor:
+      {
+         return D3D11_BLEND_INV_SRC_COLOR;
+      }
+      case GFXBlendSrcAlpha:
+      {
+         return D3D11_BLEND_SRC_ALPHA;
+      }
+      case GFXBlendInvSrcAlpha:
+      {
+         return D3D11_BLEND_INV_SRC_ALPHA;
+      }
+      case GFXBlendDestAlpha:
+      {
+         return D3D11_BLEND_DEST_ALPHA;
+      }
+      case GFXBlendInvDestAlpha:
+      {
+         return D3D11_BLEND_INV_DEST_ALPHA;
+      }
+      case GFXBlendDestColor:
+      {
+         return D3D11_BLEND_DEST_COLOR;
+      }
+      case GFXBlendInvDestColor:
+      {
+         return D3D11_BLEND_INV_DEST_COLOR;
+      }
+   }
 
-	return D3D11_BLEND_ZERO;
+   return D3D11_BLEND_ZERO;
 }
 static D3D11_BLEND_OP GetBlendOp(GFXBlendOp gfxBlendOp)
 {
@@ -182,15 +182,15 @@ static D3D11_STENCIL_OP GetStencilOp(GFXStencilOp gfxStencilOp)
 
 void GFXD3D11StateBlock::CreateD3DBlendState()
 {
-	D3D11_BLEND_DESC sBlendDesc;
-	sBlendDesc.AlphaToCoverageEnable = FALSE;
-	sBlendDesc.IndependentBlendEnable = FALSE;
+   D3D11_BLEND_DESC sBlendDesc;
+   sBlendDesc.AlphaToCoverageEnable = FALSE;
+   sBlendDesc.IndependentBlendEnable = FALSE;
 
-	D3D11_RENDER_TARGET_BLEND_DESC sRTBlendDesc;
-	sRTBlendDesc.BlendEnable =  mDesc.blendEnable;
+   D3D11_RENDER_TARGET_BLEND_DESC sRTBlendDesc;
+   sRTBlendDesc.BlendEnable =  mDesc.blendEnable;
 
-	sRTBlendDesc.SrcBlend = GetBlend(mDesc.blendSrc);
-	sRTBlendDesc.DestBlend = GetBlend(mDesc.blendDest);
+   sRTBlendDesc.SrcBlend = GetBlend(mDesc.blendSrc);
+   sRTBlendDesc.DestBlend = GetBlend(mDesc.blendDest);
 
    sRTBlendDesc.BlendOp = GetBlendOp(mDesc.blendOp);
 
@@ -214,63 +214,65 @@ void GFXD3D11StateBlock::CreateD3DBlendState()
 
 void GFXD3D11StateBlock::CreateD3DRasterizerState()
 {
-	D3D11_RASTERIZER_DESC sRastDesc;
-	sRastDesc.FillMode = D3D11_FILL_SOLID;
-	sRastDesc.CullMode = D3D11_CULL_BACK;
-	sRastDesc.FrontCounterClockwise = FALSE;
-	sRastDesc.DepthBias = mDesc.zBias;
-	sRastDesc.SlopeScaledDepthBias = mDesc.zSlopeBias;
-	sRastDesc.DepthBiasClamp = 0.0f;
-	sRastDesc.DepthClipEnable = TRUE;
-	sRastDesc.ScissorEnable = FALSE;
-	sRastDesc.MultisampleEnable = FALSE;
-	sRastDesc.AntialiasedLineEnable = FALSE;
+   D3D11_RASTERIZER_DESC sRastDesc;
+   sRastDesc.FillMode = D3D11_FILL_SOLID;
+   sRastDesc.CullMode = D3D11_CULL_BACK;
+   sRastDesc.FrontCounterClockwise = FALSE;
+   sRastDesc.DepthBias = mDesc.zBias;
+   sRastDesc.SlopeScaledDepthBias = mDesc.zSlopeBias;
+   sRastDesc.DepthBiasClamp = 0.0f;
+   sRastDesc.DepthClipEnable = TRUE;
+   sRastDesc.ScissorEnable = FALSE;
+   sRastDesc.MultisampleEnable = FALSE;
+   sRastDesc.AntialiasedLineEnable = FALSE;
 
-	if(mDesc.fillMode != GFXFillSolid)
-	{
-		sRastDesc.FillMode = D3D11_FILL_WIREFRAME;
-	}
+   if(mDesc.fillMode != GFXFillSolid)
+   {
+      sRastDesc.FillMode = D3D11_FILL_WIREFRAME;
+   }
 
-	if(mDesc.cullMode == GFXCullCW)
-	{
-		sRastDesc.CullMode = D3D11_CULL_FRONT;
-	}
+   if(mDesc.cullMode == GFXCullCW)
+   {
+      sRastDesc.CullMode = D3D11_CULL_FRONT;
+   }
 
-	mD3DDevice->CreateRasterizerState(&sRastDesc, &mRastState);
+   mD3DDevice->CreateRasterizerState(&sRastDesc, &mRastState);
 }
 
 void GFXD3D11StateBlock::CreateD3DSamplerState()
 {
-	D3D11_SAMPLER_DESC sSamplerDesc;
-	int i = 0;
+   D3D11_SAMPLER_DESC sSamplerDesc;
+   int i = 0;
 
-	for(; i < TEXTURE_STAGE_COUNT; ++i)
-	{
-		mSamplerState[i] = NULL;
-	}
+   for(; i < TEXTURE_STAGE_COUNT; ++i)
+   {
+      mSamplerState[i] = NULL;
+   }
 
-	mD3DDevice->CreateSamplerState(&sSamplerDesc, &mSamplerState[0]);
+   mD3DDevice->CreateSamplerState(&sSamplerDesc, &mSamplerState[0]);
 }
 
 void GFXD3D11StateBlock::CreateD3DDepthStencilState()
 {
-	D3D11_DEPTH_STENCIL_DESC sDepthStencilDesc;
-	sDepthStencilDesc.DepthEnable = mDesc.zEnable;
-	sDepthStencilDesc.DepthWriteMask = mDesc.zWriteEnable ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO;
-	sDepthStencilDesc.DepthFunc = GetCompFunc(mDesc.zFunc);
-	sDepthStencilDesc.StencilEnable = mDesc.stencilEnable;
-	sDepthStencilDesc.StencilReadMask = mDesc.stencilMask;
-	sDepthStencilDesc.StencilWriteMask = mDesc.stencilWriteMask;
-	sDepthStencilDesc.FrontFace.StencilFunc = GetCompFunc(mDesc.stencilFunc);
-	sDepthStencilDesc.FrontFace.StencilDepthFailOp = GetStencilOp(mDesc.stencilZFailOp);
-	sDepthStencilDesc.FrontFace.StencilPassOp = GetStencilOp(mDesc.stencilPassOp);
-	sDepthStencilDesc.FrontFace.StencilFailOp = GetStencilOp(mDesc.stencilFailOp);
+   D3D11_DEPTH_STENCIL_DESC sDepthStencilDesc;
+   sDepthStencilDesc.DepthEnable = mDesc.zEnable;
+   sDepthStencilDesc.DepthWriteMask = mDesc.zWriteEnable ? D3D11_DEPTH_WRITE_MASK_ALL : D3D11_DEPTH_WRITE_MASK_ZERO;
+   sDepthStencilDesc.DepthFunc = GetCompFunc(mDesc.zFunc);
+   sDepthStencilDesc.StencilEnable = mDesc.stencilEnable;
+   sDepthStencilDesc.StencilReadMask = mDesc.stencilMask;
+   sDepthStencilDesc.StencilWriteMask = mDesc.stencilWriteMask;
+   sDepthStencilDesc.FrontFace.StencilFunc = GetCompFunc(mDesc.stencilFunc);
+   sDepthStencilDesc.FrontFace.StencilDepthFailOp = GetStencilOp(mDesc.stencilZFailOp);
+   sDepthStencilDesc.FrontFace.StencilPassOp = GetStencilOp(mDesc.stencilPassOp);
+   sDepthStencilDesc.FrontFace.StencilFailOp = GetStencilOp(mDesc.stencilFailOp);
 
 
-	sDepthStencilDesc.BackFace.StencilFunc = sDepthStencilDesc.FrontFace.StencilFunc;
-	sDepthStencilDesc.BackFace.StencilDepthFailOp = sDepthStencilDesc.FrontFace.StencilDepthFailOp;
-	sDepthStencilDesc.BackFace.StencilPassOp = sDepthStencilDesc.FrontFace.StencilPassOp;
-	sDepthStencilDesc.BackFace.StencilFailOp = sDepthStencilDesc.FrontFace.StencilFailOp;
+   sDepthStencilDesc.BackFace.StencilFunc = sDepthStencilDesc.FrontFace.StencilFunc;
+   sDepthStencilDesc.BackFace.StencilDepthFailOp = sDepthStencilDesc.FrontFace.StencilDepthFailOp;
+   sDepthStencilDesc.BackFace.StencilPassOp = sDepthStencilDesc.FrontFace.StencilPassOp;
+   sDepthStencilDesc.BackFace.StencilFailOp = sDepthStencilDesc.FrontFace.StencilFailOp;
+
+   mD3DDevice->CreateDepthStencilState(&sDepthStencilDesc, &mDepthStencilState);
 }
 
 /// Returns the hash value of the desc that created this block
@@ -292,21 +294,21 @@ void GFXD3D11StateBlock::activate(GFXD3D11StateBlock* oldState)
    PROFILE_SCOPE( GFXD3D11StateBlock_Activate );
 
    // Blending
-	if (!oldState ||
-		oldState->mDesc.blendEnable != mDesc.blendEnable ||
-		oldState->mDesc.blendSrc != mDesc.blendSrc ||
-		oldState->mDesc.blendDest != mDesc.blendDest ||
-		oldState->mDesc.blendOp != mDesc.blendOp ||
-		mColorMask != oldState->mColorMask ||
-		oldState->mDesc.separateAlphaBlendEnable != mDesc.separateAlphaBlendEnable ||
-		oldState->mDesc.separateAlphaBlendSrc != mDesc.separateAlphaBlendSrc ||
-		oldState->mDesc.separateAlphaBlendDest != mDesc.separateAlphaBlendDest ||
-		oldState->mDesc.separateAlphaBlendOp != mDesc.separateAlphaBlendOp)
-	{
-		mD3DDeviceContext->OMSetBlendState(mBlendState, NULL, 0xFFFFFFFF);
-	}
+   if (!oldState ||
+      oldState->mDesc.blendEnable != mDesc.blendEnable ||
+      oldState->mDesc.blendSrc != mDesc.blendSrc ||
+      oldState->mDesc.blendDest != mDesc.blendDest ||
+      oldState->mDesc.blendOp != mDesc.blendOp ||
+      mColorMask != oldState->mColorMask ||
+      oldState->mDesc.separateAlphaBlendEnable != mDesc.separateAlphaBlendEnable ||
+      oldState->mDesc.separateAlphaBlendSrc != mDesc.separateAlphaBlendSrc ||
+      oldState->mDesc.separateAlphaBlendDest != mDesc.separateAlphaBlendDest ||
+      oldState->mDesc.separateAlphaBlendOp != mDesc.separateAlphaBlendOp)
+   {
+      mD3DDeviceContext->OMSetBlendState(mBlendState, NULL, 0xFFFFFFFF);
+   }
 
-	mD3DDeviceContext->OMSetDepthStencilState(mDepthStencilState, mDesc.stencilRef);
+   mD3DDeviceContext->OMSetDepthStencilState(mDepthStencilState, mDesc.stencilRef);
 
 
 #if 0
