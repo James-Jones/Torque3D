@@ -224,11 +224,14 @@ public:
 
    virtual GFXPrimitiveBuffer *allocPrimitiveBuffer(  U32 numIndices, 
                                                       U32 numPrimitives, 
-                                                      GFXBufferType bufferType );
+                                                      GFXBufferType bufferType,
+                                                      void* data = NULL);
+
    virtual GFXVertexBuffer *allocVertexBuffer(  U32 numVerts, 
                                                 const GFXVertexFormat *vertexFormat, 
                                                 U32 vertSize, 
-                                                GFXBufferType bufferType );
+                                                GFXBufferType bufferType,
+                                                void* data = NULL);
    virtual void deallocVertexBuffer( GFXD3D11VertexBuffer *vertBuff );
 
    virtual void destroyD3DResource( ID3D11Resource *d3dResource ) { SAFE_RELEASE( d3dResource ); }; 

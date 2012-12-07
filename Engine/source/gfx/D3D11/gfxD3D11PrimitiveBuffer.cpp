@@ -55,7 +55,15 @@ void GFXD3D11PrimitiveBuffer::unlock()
 
    #endif // TORQUE_DEBUG
 
-   ((GFXD3D11Device*)mDevice)->getDeviceContext()->Unmap( ib, 0);
+   if(mBufferType == GFXBufferTypeStatic)
+   {
+      ((GFXD3D11Device*)mDevice)->getDeviceContext()->Unmap( stagingBuffer, 0);
+      ((GFXD3D11Device*)mDevice)->getDeviceContext()->CopyResource(ib, stagingBuffer);
+   }
+   else
+   {
+      ((GFXD3D11Device*)mDevice)->getDeviceContext()->Unmap( ib, 0);
+   }
    mLocked = false;
    mIsFirstLock = false;
    mVolatileBuffer = NULL;
@@ -67,6 +75,7 @@ GFXD3D11PrimitiveBuffer::~GFXD3D11PrimitiveBuffer()
    {
       SAFE_RELEASE( ib );
    }
+   SAFE_RELEASE( stagingBuffer );
 }
 
 void GFXD3D11PrimitiveBuffer::zombify()
@@ -114,12 +123,14 @@ void GFXD3D11PrimitiveBuffer::lock(U32 indexStart, U32 indexEnd, void **indexPtr
    AssertFatal(!mLocked, "GFXD3D11PrimitiveBuffer::lock - Can't lock a primitive buffer more than once!");
    mLocked = true;
 
+   ID3D11Buffer* bufferToMap = ib;
+
    D3D11_MAP mapType = D3D11_MAP_WRITE;
 
    switch(mBufferType)
    {
    case GFXBufferTypeStatic:
-      mapType = D3D11_MAP_WRITE;
+      bufferToMap = stagingBuffer;
       break;
 
    case GFXBufferTypeDynamic:
@@ -153,13 +164,14 @@ void GFXD3D11PrimitiveBuffer::lock(U32 indexStart, U32 indexEnd, void **indexPtr
 
       mVolatileBuffer->mIndexCount = indexEnd + 1;
       ib = mVolatileBuffer->ib;
+      bufferToMap = ib;
 
       break;
    }
 
    D3D11_MAPPED_SUBRESOURCE MappedResource;
 
-   D3D11Assert( ((GFXD3D11Device*)mDevice)->getDeviceContext()->Map( ib, 0, mapType, 0, &MappedResource ),
+   D3D11Assert( ((GFXD3D11Device*)mDevice)->getDeviceContext()->Map( bufferToMap, 0, mapType, 0, &MappedResource ),
       "GFXD3D11PrimitiveBuffer::lock - Could not lock primitive buffer.");
 
    //Map from indexStart * sizeof(U16) upto (indexEnd * sizeof(U16))

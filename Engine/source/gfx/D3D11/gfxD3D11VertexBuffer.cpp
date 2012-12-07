@@ -37,6 +37,10 @@ GFXD3D11VertexBuffer::~GFXD3D11VertexBuffer()
       else if (mBufferType != GFXBufferTypeVolatile)
       {
          static_cast<GFXD3D11Device *>(getOwningDevice())->destroyD3DResource( vb );
+         if(stagingBuffer)
+         {
+            static_cast<GFXD3D11Device *>(getOwningDevice())->destroyD3DResource( stagingBuffer );
+         }
       }
    }
 }
@@ -52,13 +56,14 @@ void GFXD3D11VertexBuffer::lock(U32 vertexStart, U32 vertexEnd, void **vertexPtr
 
    D3D11_MAP mapType = D3D11_MAP_WRITE;
 
-
    GFXD3D11Device *d = static_cast<GFXD3D11Device *>( mDevice );
+
+   ID3D11Buffer* bufferToMap = vb;
 
    switch( mBufferType )
    {
    case GFXBufferTypeStatic:
-      mapType = D3D11_MAP_WRITE;
+      bufferToMap = stagingBuffer;
       break;
 
    case GFXBufferTypeDynamic:
@@ -75,6 +80,7 @@ void GFXD3D11VertexBuffer::lock(U32 vertexStart, U32 vertexEnd, void **vertexPtr
          mVolatileBuffer = d->createVBPool( &mVertexFormat, mVertexSize );
 
       vb = mVolatileBuffer->vb;
+      bufferToMap = vb;
 
       // Get our range now...
       AssertFatal(vertexStart == 0,              "Cannot get a subrange on a volatile buffer.");
@@ -111,7 +117,7 @@ void GFXD3D11VertexBuffer::lock(U32 vertexStart, U32 vertexEnd, void **vertexPtr
 
    D3D11_MAPPED_SUBRESOURCE MappedResource;
 
-   D3D11Assert( d->getDeviceContext()->Map( vb, 0, mapType, 0, &MappedResource ),
+   D3D11Assert( d->getDeviceContext()->Map( bufferToMap, 0, mapType, 0, &MappedResource ),
       "Unable to lock vertex buffer.");
 
    //Map from vertexStart * mVertexSize), length sizeToLock
@@ -163,7 +169,15 @@ void GFXD3D11VertexBuffer::unlock()
 
    #endif // TORQUE_DEBUG
 
-   ((GFXD3D11Device*)mDevice)->getDeviceContext()->Unmap( vb, 0);
+   if(mBufferType == GFXBufferTypeStatic)
+   {
+      ((GFXD3D11Device*)mDevice)->getDeviceContext()->Unmap( stagingBuffer, 0);
+      ((GFXD3D11Device*)mDevice)->getDeviceContext()->CopyResource(vb, stagingBuffer);
+   }
+   else
+   {
+      ((GFXD3D11Device*)mDevice)->getDeviceContext()->Unmap( vb, 0);
+   }
 
    mIsFirstLock = false;
 

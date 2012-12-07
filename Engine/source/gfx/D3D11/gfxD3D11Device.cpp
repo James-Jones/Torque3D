@@ -121,7 +121,8 @@ GFXD3D11Device::~GFXD3D11Device()
 GFXVertexBuffer * GFXD3D11Device::allocVertexBuffer(   U32 numVerts, 
                                                       const GFXVertexFormat *vertexFormat, 
                                                       U32 vertSize, 
-                                                      GFXBufferType bufferType )
+                                                      GFXBufferType bufferType,
+                                                      void* data)
 {
    PROFILE_SCOPE( GFXD3D9Device_allocVertexBuffer );
 
@@ -138,9 +139,11 @@ GFXVertexBuffer * GFXD3D11Device::allocVertexBuffer(   U32 numVerts,
    bufferDesc.BindFlags       = D3D11_BIND_VERTEX_BUFFER;
    bufferDesc.CPUAccessFlags  = 0;
    bufferDesc.MiscFlags       = 0;
+   bufferDesc.StructureByteStride = vertSize;
 
    // Assumptions:
-   //    - static buffers are write once, use many
+   //    - immutable buffers are write once, use many. Data must be available at create time.
+   //    - static buffers are write rarely, use many
    //    - dynamic buffers are write many, use many
    //    - volatile buffers are write once, use once
    // You may never read from a buffer.
@@ -148,13 +151,27 @@ GFXVertexBuffer * GFXD3D11Device::allocVertexBuffer(   U32 numVerts,
    //torque only uses map/unmap. This should be changed.
    switch(bufferType)
    {
+   case GFXBufferTypeImmutable:
+      bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
+      break;
    case GFXBufferTypeStatic:
-      bufferDesc.Usage = D3D11_USAGE_DYNAMIC;//Should be D3D11_USAGE_IMMUTABLE
+      bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+
+      //Create the stagine buffer used to update this resource
+      D3D11_BUFFER_DESC stagingDesc;
+      stagingDesc.Usage           = D3D11_USAGE_STAGING;
+      stagingDesc.ByteWidth       = vertSize * numVerts;
+      stagingDesc.BindFlags       = 0;
+      stagingDesc.CPUAccessFlags  = D3D11_CPU_ACCESS_WRITE;
+      stagingDesc.MiscFlags       = 0;
+      stagingDesc.StructureByteStride = vertSize;
+      D3D11Assert(mD3DDevice->CreateBuffer( &stagingDesc, NULL, &res->stagingBuffer ), "Failed to allocate an index buffer.");
       break;
 
    case GFXBufferTypeDynamic:
    case GFXBufferTypeVolatile:
-      bufferDesc.Usage = D3D11_USAGE_DYNAMIC;//Should be D3D11_USAGE_DEFAULT
+      bufferDesc.Usage = D3D11_USAGE_DYNAMIC;//Should be D3D11_USAGE_DEFAULT?
+      bufferDesc.CPUAccessFlags |= D3D11_CPU_ACCESS_WRITE;
       break;
    }
 
@@ -166,7 +183,7 @@ GFXVertexBuffer * GFXD3D11Device::allocVertexBuffer(   U32 numVerts,
       // NOTE: Volatile VBs are pooled and will be allocated at lock time.
 
       AssertFatal( numVerts <= MAX_DYNAMIC_VERTS, 
-         "GFXD3D9Device::allocVertexBuffer - Volatile vertex buffer is too big... see MAX_DYNAMIC_VERTS!" );
+         "GFXD3D11Device::allocVertexBuffer - Volatile vertex buffer is too big... see MAX_DYNAMIC_VERTS!" );
    }
    else
    {
@@ -174,7 +191,18 @@ GFXVertexBuffer * GFXD3D11Device::allocVertexBuffer(   U32 numVerts,
       vertexFormat->getDecl();
 
       // Get a new buffer...
-      D3D11Assert(mD3DDevice->CreateBuffer( &bufferDesc, NULL, &res->vb ), "Failed to allocate VB");
+      if(data)
+      {
+         D3D11_SUBRESOURCE_DATA subresData;
+         subresData.pSysMem = data;
+         subresData.SysMemPitch = bufferDesc.ByteWidth;
+         subresData.SysMemSlicePitch = 0;
+         D3D11Assert(mD3DDevice->CreateBuffer( &bufferDesc, &subresData, &res->vb ), "Failed to allocate VB.");
+      }
+      else
+      {
+         D3D11Assert(mD3DDevice->CreateBuffer( &bufferDesc, NULL, &res->vb ), "Failed to allocate VB");
+      }
    }
 
    res->mNumVerts = numVerts;
@@ -195,7 +223,8 @@ void GFXD3D11Device::deallocVertexBuffer( GFXD3D11VertexBuffer *vertBuff )
 //-----------------------------------------------------------------------------
 GFXPrimitiveBuffer * GFXD3D11Device::allocPrimitiveBuffer(   U32 numIndices, 
                                                             U32 numPrimitives, 
-                                                            GFXBufferType bufferType )
+                                                            GFXBufferType bufferType,
+                                                            void* data)
 {
    // Allocate a buffer to return
    GFXD3D11PrimitiveBuffer * res = new GFXD3D11PrimitiveBuffer(this, numIndices, numPrimitives, bufferType);
@@ -207,13 +236,14 @@ GFXPrimitiveBuffer * GFXD3D11Device::allocPrimitiveBuffer(   U32 numIndices,
    D3D11_BUFFER_DESC bufferDesc;
    bufferDesc.ByteWidth       = bytesPerIndex * numIndices;
    bufferDesc.BindFlags       = D3D11_BIND_INDEX_BUFFER;
-   bufferDesc.CPUAccessFlags  = D3D11_CPU_ACCESS_WRITE;
+   bufferDesc.CPUAccessFlags  = 0;
    bufferDesc.MiscFlags       = 0;
    bufferDesc.StructureByteStride = bytesPerIndex;
 
 
    // Assumptions:
-   //    - static buffers are write once, use many
+   //    - immutable buffers are write once, use many. Data must be available at create time.
+   //    - static buffers are write rarely, use many
    //    - dynamic buffers are write many, use many
    //    - volatile buffers are write once, use once
    // You may never read from a buffer.
@@ -221,14 +251,29 @@ GFXPrimitiveBuffer * GFXD3D11Device::allocPrimitiveBuffer(   U32 numIndices,
    //torque only uses map/unmap. This should be changed.
    switch(bufferType)
    {
+   case GFXBufferTypeImmutable:
+      bufferDesc.Usage = D3D11_USAGE_IMMUTABLE;
+      break;
    case GFXBufferTypeStatic:
-      bufferDesc.Usage = D3D11_USAGE_DYNAMIC;//Should be D3D11_USAGE_IMMUTABLE;
+      bufferDesc.Usage = D3D11_USAGE_DEFAULT;
+
+      //Create the stagine buffer used to update this resource
+      D3D11_BUFFER_DESC stagingDesc;
+      stagingDesc.Usage           = D3D11_USAGE_STAGING;
+      stagingDesc.ByteWidth       = bytesPerIndex * numIndices;
+      stagingDesc.BindFlags       = 0;
+      stagingDesc.CPUAccessFlags  = D3D11_CPU_ACCESS_WRITE;
+      stagingDesc.MiscFlags       = 0;
+      stagingDesc.StructureByteStride = bytesPerIndex;
+      D3D11Assert(mD3DDevice->CreateBuffer( &stagingDesc, NULL, &res->stagingBuffer ), "Failed to allocate an index buffer.");
       break;
    case GFXBufferTypeDynamic:
       bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+      bufferDesc.CPUAccessFlags |= D3D11_CPU_ACCESS_WRITE;
       break;
    case GFXBufferTypeVolatile:
-      bufferDesc.Usage = D3D11_USAGE_DYNAMIC;//Should be either DEFAULT or IMMUTABLE.
+      bufferDesc.Usage = D3D11_USAGE_DYNAMIC;//Should be either DEFAULT?
+      bufferDesc.CPUAccessFlags |= D3D11_CPU_ACCESS_WRITE;
       break;
    }
 
@@ -248,9 +293,19 @@ GFXPrimitiveBuffer * GFXD3D11Device::allocPrimitiveBuffer(   U32 numIndices,
    else
    {
       // Otherwise, get it as a seperate buffer...
-      D3D11Assert(mD3DDevice->CreateBuffer( &bufferDesc, NULL, &res->ib ), "Failed to allocate an index buffer.");
-      //D3D11Assert(mD3DDevice->CreateIndexBuffer( sizeof(U16) * numIndices , usage, GFXD3D9IndexFormat[GFXIndexFormat16], pool, &res->ib, 0),
-       //  "Failed to allocate an index buffer.");
+      if(data)
+      {
+         D3D11_SUBRESOURCE_DATA subresData;
+         subresData.pSysMem = data;
+         subresData.SysMemPitch = bufferDesc.ByteWidth;
+         subresData.SysMemSlicePitch = 0;
+         D3D11Assert(mD3DDevice->CreateBuffer( &bufferDesc, &subresData, &res->ib ), "Failed to allocate an index buffer.");
+      }
+      else
+      {
+         D3D11Assert(mD3DDevice->CreateBuffer( &bufferDesc, NULL, &res->ib ), "Failed to allocate an index buffer.");
+      }
+
    }
 
    return res;

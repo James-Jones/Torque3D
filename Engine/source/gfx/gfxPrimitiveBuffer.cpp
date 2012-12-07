@@ -69,7 +69,7 @@ const String GFXPrimitiveBuffer::describeSelf() const
 }
 
 //-----------------------------------------------------------------------------
-// Set
+// set
 //-----------------------------------------------------------------------------
 void GFXPrimitiveBufferHandle::set(GFXDevice *theDevice, U32 indexCount, U32 primitiveCount, GFXBufferType bufferType, String desc)
 {
@@ -80,3 +80,17 @@ void GFXPrimitiveBufferHandle::set(GFXDevice *theDevice, U32 indexCount, U32 pri
       getPointer()->mDebugCreationPath = desc;
 #endif
 }
+
+//-----------------------------------------------------------------------------
+// immutable
+//-----------------------------------------------------------------------------
+void GFXPrimitiveBufferHandle::immutable(GFXDevice *theDevice, U32 indexCount, U32 primitiveCount, void* data, String desc)
+{
+   StrongRefPtr<GFXPrimitiveBuffer>::operator=( theDevice->allocPrimitiveBuffer(indexCount, primitiveCount, GFXBufferTypeImmutable, data) );
+
+#ifdef TORQUE_DEBUG
+   if( desc.isNotEmpty() )
+      getPointer()->mDebugCreationPath = desc;
+#endif
+}
+

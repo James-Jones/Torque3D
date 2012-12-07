@@ -37,6 +37,7 @@ class GFXD3D11VertexBuffer : public GFXVertexBuffer
 {
 public:
    ID3D11Buffer *vb;
+   ID3D11Buffer *stagingBuffer;
    StrongRefPtr<GFXD3D11VertexBuffer> mVolatileBuffer;
 
 #ifdef TORQUE_DEBUG
@@ -86,6 +87,7 @@ inline GFXD3D11VertexBuffer::GFXD3D11VertexBuffer()
    name = NULL;
 #endif
    vb = NULL;
+   stagingBuffer = NULL;
    mIsFirstLock = true;
    lockedVertexEnd = lockedVertexStart = 0;
    mClearAtFrameEnd = false;

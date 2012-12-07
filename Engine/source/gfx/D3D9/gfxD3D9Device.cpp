@@ -732,7 +732,8 @@ void GFXD3D9Device::setShader( GFXShader *shader )
 //-----------------------------------------------------------------------------
 GFXPrimitiveBuffer * GFXD3D9Device::allocPrimitiveBuffer(   U32 numIndices, 
                                                             U32 numPrimitives, 
-                                                            GFXBufferType bufferType )
+                                                            GFXBufferType bufferType,
+                                                            void* data)
 {
    // Allocate a buffer to return
    GFXD3D9PrimitiveBuffer * res = new GFXD3D9PrimitiveBuffer(this, numIndices, numPrimitives, bufferType);
@@ -742,12 +743,13 @@ GFXPrimitiveBuffer * GFXD3D9Device::allocPrimitiveBuffer(   U32 numIndices,
    D3DPOOL pool = D3DPOOL_DEFAULT;
 
    // Assumptions:
-   //    - static buffers are write once, use many
+   //    - static buffers are write rarely, use many
    //    - dynamic buffers are write many, use many
    //    - volatile buffers are write once, use once
    // You may never read from a buffer.
    switch(bufferType)
    {
+   case GFXBufferTypeImmutable:
    case GFXBufferTypeStatic:
       pool = isD3D9Ex() ? D3DPOOL_DEFAULT : D3DPOOL_MANAGED;
       break;
@@ -783,6 +785,14 @@ GFXPrimitiveBuffer * GFXD3D9Device::allocPrimitiveBuffer(   U32 numIndices,
          "Failed to allocate an index buffer.");
    }
 
+   if(data)
+   {
+      void* dest;
+      res->lock(0, numIndices, &dest);
+      dMemcpy(dest, data, sizeof(U16) * numIndices);
+      res->unlock();
+   }
+
    return res;
 }
 
@@ -792,7 +802,8 @@ GFXPrimitiveBuffer * GFXD3D9Device::allocPrimitiveBuffer(   U32 numIndices,
 GFXVertexBuffer * GFXD3D9Device::allocVertexBuffer(   U32 numVerts, 
                                                       const GFXVertexFormat *vertexFormat, 
                                                       U32 vertSize, 
-                                                      GFXBufferType bufferType )
+                                                      GFXBufferType bufferType,
+                                                      void* data)
 {
    PROFILE_SCOPE( GFXD3D9Device_allocVertexBuffer );
 
@@ -809,7 +820,7 @@ GFXVertexBuffer * GFXD3D9Device::allocVertexBuffer(   U32 numVerts,
    res->mNumVerts = 0;
 
    // Assumptions:
-   //    - static buffers are write once, use many
+   //    - static buffers are write rarely, use many
    //    - dynamic buffers are write many, use many
    //    - volatile buffers are write once, use once
    // You may never read from a buffer.
@@ -851,6 +862,15 @@ GFXVertexBuffer * GFXD3D9Device::allocVertexBuffer(   U32 numVerts,
    }
 
    res->mNumVerts = numVerts;
+
+   if(data)
+   {
+      void* dest;
+      res->lock(0, numVerts, &dest);
+      dMemcpy(dest, data, vertSize * numVerts);
+      res->unlock();
+   }
+
    return res;
 }
 
