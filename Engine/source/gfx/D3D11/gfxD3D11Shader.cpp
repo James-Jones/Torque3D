@@ -912,11 +912,8 @@ bool GFXD3D11Shader::_compileShader( const Torque::Path &filePath,
                                               code->GetBufferSize(), NULL, &mVertShader );
       }
 
-AssertFatal(0, "Implement _getShaderConstants");
-#if 0
       if (res == S_OK)
-         _getShaderConstants(table, bufferLayoutF, bufferLayoutI, samplerDescriptions);
-#endif
+         _getShaderConstants(code, bufferLayoutF, bufferLayoutI, samplerDescriptions);
 
 #ifdef TORQUE_ENABLE_CSF_GENERATION
 
@@ -940,177 +937,172 @@ AssertFatal(0, "Implement _getShaderConstants");
    return result;
 }
 
-#if 0
-void GFXD3D11Shader::_getShaderConstants( ID3DXConstantTable *table, 
+
+void GFXD3D11Shader::_getShaderConstants( ID3DBlob *code, 
                                          GenericConstBufferLayout *bufferLayoutF, 
                                          GenericConstBufferLayout* bufferLayoutI,
                                          Vector<GFXShaderConstDesc> &samplerDescriptions )
 {
    PROFILE_SCOPE( GFXD3D11Shader_GetShaderConstants );
 
-   AssertFatal(table, "NULL constant table not allowed, is this an assembly shader?");
+   ID3D11ShaderReflection* pReflector = NULL;
 
-AssertFatal(0, "Not implmented");
+   D3DReflect( code->GetBufferPointer(), code->GetBufferSize(), 
+            IID_ID3D11ShaderReflection, (void**) &pReflector);
 
-#if 0
+   D3D11_SHADER_DESC desc;
+   pReflector->GetDesc(&desc);
 
-   D3DXCONSTANTTABLE_DESC tableDesc;
-   D3D11Assert(table->GetDesc(&tableDesc), "Unable to get constant table info.");
-
-   for (U32 i = 0; i < tableDesc.Constants; i++)
+   for(U32 i = 0; i < desc.ConstantBuffers; i++)
    {
-      D3DXHANDLE handle = table->GetConstant(0, i);
-      const U32 descSize=16;
-      D3DXCONSTANT_DESC constantDescArray[descSize];
-      U32 size = descSize;
-      if (table->GetConstantDesc(handle, constantDescArray, &size) == S_OK)
+      ID3D11ShaderReflectionConstantBuffer * cbuf = pReflector->GetConstantBufferByIndex(i);
+
+      D3D11_SHADER_BUFFER_DESC cbufDesc;
+      cbuf->GetDesc(&cbufDesc);
+
+      for(U32 k = 0; k < cbufDesc.Variables; ++k)
       {
-         D3DXCONSTANT_DESC& constantDesc = constantDescArray[0];
-         GFXShaderConstDesc desc;
-                  
-         desc.name = String(constantDesc.Name);
+         GFXShaderConstDesc outDesc; // structure we are filling in.
+
+         //Variable
+         ID3D11ShaderReflectionVariable* cbufVar = cbuf->GetVariableByIndex(k);
+         D3D11_SHADER_VARIABLE_DESC varDesc;
+         cbufVar->GetDesc(&varDesc);
+
+         //Type of variable
+         D3D11_SHADER_TYPE_DESC typeDesc;
+         ID3D11ShaderReflectionType* type = cbufVar->GetType();
+         type->GetDesc(&typeDesc);         
+         
+         outDesc.name = String(varDesc.Name);
+
          // Prepend a "$" if it doesn't exist.  Just to make things consistent.
-         if (desc.name.find("$") != 0)
-            desc.name = String::ToString("$%s", desc.name.c_str());
-         //Con::printf("name %s: , offset: %d, size: %d, constantDesc.Elements: %d", desc.name.c_str(), constantDesc.RegisterIndex, constantDesc.Bytes, constantDesc.Elements);
-         desc.arraySize = constantDesc.Elements;         
-                  
+         if (outDesc.name.find("$") != 0)
+            outDesc.name = String::ToString("$%s", outDesc.name.c_str());
+
+         outDesc.arraySize = typeDesc.Elements;
+
          GenericConstBufferLayout* bufferLayout = NULL;
-         switch (constantDesc.RegisterSet)
+
+         switch(typeDesc.Type)
          {
-            case D3DXRS_INT4 :   
+            case D3D_SVT_FLOAT:
+            {
+               bufferLayout = bufferLayoutI;
+               switch(typeDesc.Class)
                {
-                  bufferLayout = bufferLayoutI;
-                  switch (constantDesc.Class)
+                  case D3D_SVC_SCALAR:
                   {
-                     case D3DXPC_SCALAR :
-                        desc.constType = GFXSCT_Int;
-                        break;
-                     case D3DXPC_VECTOR :
-                        {
-                           switch (constantDesc.Columns)
-                           {
-                           case 1 :
-                              desc.constType = GFXSCT_Int;
-                              break;
-                           case 2 :
-                              desc.constType = GFXSCT_Int2;
-                              break;
-                           case 3 :
-                              desc.constType = GFXSCT_Int3;
-                              break;
-                           case 4 :
-                              desc.constType = GFXSCT_Int4;
-                              break;                           
-                           default:
-                              AssertFatal(false, "Unknown int vector type!");
-                              break;
-                           }
-                        }
-                        break;
+                     outDesc.constType = GFXSCT_Float;
+                     break;
                   }
-                  desc.constType = GFXSCT_Int4;
-                  break;
-               }
-            case D3DXRS_FLOAT4 :
-               {  
-                  bufferLayout = bufferLayoutF;
-                  switch (constantDesc.Class)
+                  case D3D_SVC_VECTOR:
                   {
-                  case D3DXPC_SCALAR:                     
-                     desc.constType = GFXSCT_Float;
-                     break;
-                  case D3DXPC_VECTOR :               
-                     {                     
-                        switch (constantDesc.Columns)
-                        {
-                           case 1 :
-                              desc.constType = GFXSCT_Float;
-                              break;
-                           case 2 :
-                              desc.constType = GFXSCT_Float2;
-                              break;
-                           case 3 :
-                              desc.constType = GFXSCT_Float3;
-                              break;
-                           case 4 :
-                              desc.constType = GFXSCT_Float4;
-                              break;                           
-                           default:
-                              AssertFatal(false, "Unknown float vector type!");
-                              break;
-                        }
-                     }
-                     break;
-                  case D3DXPC_MATRIX_ROWS :
-                  case D3DXPC_MATRIX_COLUMNS :                     
+                     switch (typeDesc.Columns)
                      {
-                        switch (constantDesc.RegisterCount)                        
-                        {
-                           case 3 :
-                              desc.constType = GFXSCT_Float3x3;
-                              break;
-                           case 4 :
-                              desc.constType = GFXSCT_Float4x4;
-                              break;
-                        }
+                     case 1 :
+                        outDesc.constType = GFXSCT_Float;
+                        break;
+                     case 2 :
+                        outDesc.constType = GFXSCT_Float2;
+                        break;
+                     case 3 :
+                        outDesc.constType = GFXSCT_Float3;
+                        break;
+                     case 4 :
+                        outDesc.constType = GFXSCT_Float4;
+                        break;                           
+                     default:
+                        AssertFatal(false, "Unknown float vector type!");
+                        break;
                      }
                      break;
-                  case D3DXPC_OBJECT :
-                  case D3DXPC_STRUCT :
+                  }
+                  case D3D_SVC_MATRIX_ROWS:
+                  case D3D_SVC_MATRIX_COLUMNS:
+                  {
+                     switch (typeDesc.Columns)                        
+                     {
+                        case 3 :
+                           outDesc.constType = GFXSCT_Float3x3;
+                           break;
+                        case 4 :
+                           outDesc.constType = GFXSCT_Float4x4;
+                           break;
+                     }
+                     break;
+                  }
+                  default:
+                  {
                      bufferLayout = NULL;
                      break;
                   }
                }
                break;
-            case D3DXRS_SAMPLER :
+            }
+            case D3D_SVT_INT:
+            {
+               bufferLayout = bufferLayoutI;
+               switch(typeDesc.Class)
                {
-                  AssertFatal( constantDesc.Elements == 1, "Sampler Arrays not yet supported!" );
-
-                  switch (constantDesc.Type)
+                  case D3D_SVC_SCALAR:
                   {
-                     case D3DXPT_SAMPLER :
-                     case D3DXPT_SAMPLER1D :
-                     case D3DXPT_SAMPLER2D :
-                     case D3DXPT_SAMPLER3D :
-                        // Hi-jack the desc's arraySize to store the registerIndex.
-                        desc.constType = GFXSCT_Sampler;
-                        desc.arraySize = constantDesc.RegisterIndex;
-                        samplerDescriptions.push_back( desc );
+                     outDesc.constType = GFXSCT_Int;
+                     break;
+                  }
+                  case D3D_SVC_VECTOR:
+                  {
+                     switch (typeDesc.Columns)
+                     {
+                     case 1 :
+                        outDesc.constType = GFXSCT_Int;
                         break;
-                     case D3DXPT_SAMPLERCUBE :
-                        desc.constType = GFXSCT_SamplerCube;
-                        desc.arraySize = constantDesc.RegisterIndex;
-                        samplerDescriptions.push_back( desc );
+                     case 2 :
+                        outDesc.constType = GFXSCT_Int2;
                         break;
+                     case 3 :
+                        outDesc.constType = GFXSCT_Int3;
+                        break;
+                     case 4 :
+                        outDesc.constType = GFXSCT_Int4;
+                        break;                           
+                     default:
+                        AssertFatal(false, "Unknown int vector type!");
+                        break;
+                     }
+                     break;
+                  }
+                  default:
+                  {
+                     bufferLayout = NULL;
+                     break;
                   }
                }
                break;
-            default:               
-               AssertFatal(false, "Unknown shader constant class enum");               
+            }
+            default:
+            {
+               bufferLayout = NULL;
                break;
-         }         
-         
+            }
+         }
+
          if (bufferLayout)
          {
-            mShaderConsts.push_back(desc);
+            mShaderConsts.push_back(outDesc);
 
-            U32 alignBytes = getAlignmentValue(desc.constType);
-            U32 paramSize = alignBytes * desc.arraySize;
-            bufferLayout->addParameter(   desc.name, 
-                                          desc.constType, 
-                                          constantDesc.RegisterIndex * sizeof(Point4F), 
+            U32 alignBytes = getAlignmentValue(outDesc.constType);
+            U32 paramSize = alignBytes * outDesc.arraySize;
+            bufferLayout->addParameter(   outDesc.name, 
+                                          outDesc.constType, 
+                                          varDesc.StartOffset, 
                                           paramSize, 
-                                          desc.arraySize, 
+                                          outDesc.arraySize, 
                                           alignBytes );
          }
       }
-      else
-         AssertFatal(false, "Unable to get shader constant description! (may need more elements of constantDesc");
    }
-#endif
 }
-#endif
 
 const U32 GFXD3D11Shader::smCompiledShaderTag = MakeFourCC('t','c','s','f');
 

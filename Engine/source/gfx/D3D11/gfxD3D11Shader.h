@@ -246,12 +246,10 @@ protected:
                                 GenericConstBufferLayout *bufferLayoutI,
                                 Vector<GFXShaderConstDesc> &samplerDescriptions );
 
-#if 0
-   void _getShaderConstants( ID3DXConstantTable* table, 
+   void _getShaderConstants( ID3DBlob* code, 
                              GenericConstBufferLayout *bufferLayoutF, 
                              GenericConstBufferLayout *bufferLayoutI,
                              Vector<GFXShaderConstDesc> &samplerDescriptions );
-#endif
 
    bool _saveCompiledOutput( const Torque::Path &filePath, 
                              ID3DBlob *buffer, 
