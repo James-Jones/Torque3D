@@ -101,7 +101,7 @@ public:
 
    virtual void activate() { };
    virtual void deactivate() { };
-   virtual GFXAdapterType getAdapterType() { return NullDevice; };
+   virtual GFXAdapterType getAdapterType() { return Direct3D11; };
 
    /// @name Debug Methods
    /// @{
@@ -126,6 +126,9 @@ protected:
    DXGI_SAMPLE_DESC mMultisampleInfo;
    F32 mPixVersion;
    U32 mNumRenderTargets;
+
+   ID3D11PixelShader* mLastPixShader;
+   ID3D11VertexShader* mLastVertShader;
 
    StrongRefPtr<GFXD3D11PrimitiveBuffer> mDynamicPB;   ///< Dynamic index buffer
    GFXD3D11PrimitiveBuffer* mCurrentPB;
@@ -190,10 +193,11 @@ public:
 
    virtual F32 getPixelShaderVersion() const { return mPixVersion; };
    virtual void setPixelShaderVersion( F32 version ) { mPixVersion = version;};
+   virtual void setShader( GFXShader *shader );
    virtual U32 getNumSamplers() const { return 16; };
    virtual U32 getNumRenderTargets() const { return mNumRenderTargets; };
 
-   virtual GFXShader* createShader() { return NULL; };
+   virtual GFXShader* createShader();
 
 
    virtual void clear( U32 flags, ColorI color, F32 z, U32 stencil ) { };

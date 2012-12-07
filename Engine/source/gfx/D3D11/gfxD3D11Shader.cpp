@@ -778,6 +778,8 @@ bool GFXD3D11Shader::_compileShader( const Torque::Path &filePath,
    static String sHLSLStr( "hlsl" );
    static String sOBJStr( "obj" );
 
+   flags |= D3DCOMPILE_ENABLE_BACKWARDS_COMPATIBILITY;
+
    // Is it an HLSL shader?
    if ( filePath.getExtension().equal(sHLSLStr, String::NoCase) )   
    {

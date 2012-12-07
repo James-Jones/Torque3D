@@ -40,6 +40,7 @@
 #include "gfx/D3D11/gfxD3D11Cubemap.h"
 #include "gfx/D3D11/gfxD3D11TextureObject.h"
 #include "gfx/D3D11/gfxD3D11TextureManager.h"
+#include "gfx/D3D11/gfxD3D11Shader.h"
 
 #include <vector>
 
@@ -90,7 +91,7 @@ GFXDevice *GFXD3D11Device::createInstance( U32 adapterIndex )
    return new GFXD3D11Device();
 }
 
-GFXD3D11Device::GFXD3D11Device() : mD3DDevice(NULL)
+GFXD3D11Device::GFXD3D11Device() : mD3DDevice(NULL), mLastPixShader(NULL), mLastVertShader(NULL)
 {
    clip.set(0, 0, 800, 800);
 
@@ -772,7 +773,34 @@ GFXFormat GFXD3D11Device::selectSupportedFormat(  GFXTextureProfile *profile,
       }
    }
    return GFXFormatR8G8B8A8;
-};
+}
+
+GFXShader* GFXD3D11Device::createShader()
+{
+   GFXD3D11Shader* shader = new GFXD3D11Shader();
+   shader->registerResourceWithDevice( this );
+   return shader;
+}
+
+void GFXD3D11Device::setShader( GFXShader *shader )
+{
+   GFXD3D11Shader *d3dShader = static_cast<GFXD3D11Shader*>( shader );
+
+   ID3D11PixelShader *pixShader = ( d3dShader != NULL ? d3dShader->mPixShader : NULL );
+   ID3D11VertexShader *vertShader = ( d3dShader ? d3dShader->mVertShader : NULL );
+
+   if( pixShader != mLastPixShader )
+   {
+      mImmediateContext->PSSetShader(pixShader, NULL, 0);
+      mLastPixShader = pixShader;
+   }
+
+   if( vertShader != mLastVertShader )
+   {
+      mImmediateContext->VSSetShader(vertShader, NULL, 0);
+      mLastVertShader = vertShader;
+   }
+}
 
 //
 // Register this device with GFXInit
