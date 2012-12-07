@@ -197,8 +197,8 @@ public:
 
 
    virtual void clear( U32 flags, ColorI color, F32 z, U32 stencil ) { };
-   virtual bool beginSceneInternal() { return true; };
-   virtual void endSceneInternal() { };
+   virtual bool beginSceneInternal() { mCanCurrentlyRender = true; return true; };
+   virtual void endSceneInternal() { mCanCurrentlyRender = false; };
 
    virtual void drawPrimitive( GFXPrimitiveType primType, U32 vertexStart, U32 primitiveCount );
    virtual void drawIndexedPrimitive(  GFXPrimitiveType primType, 
