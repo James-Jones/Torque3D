@@ -1092,10 +1092,10 @@ void GFXD3D11Shader::_getShaderConstants( ID3DBlob *code,
             mShaderConsts.push_back(outDesc);
 
             U32 alignBytes = getAlignmentValue(outDesc.constType);
-            U32 paramSize = alignBytes * outDesc.arraySize;
+            U32 paramSize = varDesc.Size;
             bufferLayout->addParameter(   outDesc.name, 
                                           outDesc.constType, 
-                                          varDesc.StartOffset, 
+                                          varDesc.StartOffset,
                                           paramSize, 
                                           outDesc.arraySize, 
                                           alignBytes );
