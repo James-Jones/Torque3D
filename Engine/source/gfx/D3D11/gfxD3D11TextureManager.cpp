@@ -78,24 +78,30 @@ void GFXD3D11TextureManager::_innerCreateTexture( GFXD3D11TextureObject *retTex,
    // Some relevant helper information...
    bool supportsAutoMips = GFX->getCardProfiler()->queryProfile("autoMipMapLevel", true);
    
-   D3D11_USAGE usage = D3D11_USAGE_DYNAMIC;//Eventually this should be D3D11_USAGE_DEFAULT
+   D3D11_USAGE usage = D3D11_USAGE_DEFAULT;
    UINT bind = D3D11_BIND_SHADER_RESOURCE;
-   UINT cpuAccess = D3D11_CPU_ACCESS_WRITE;//Eventually this should be 0
+   UINT cpuAccess = 0;
    UINT misc = 0;
 
    retTex->mProfile = profile;
 
    DXGI_FORMAT d3dTextureFormat = GFXD3D11TextureFormat[format];
 
+   AssertFatal(d3dTextureFormat != DXGI_FORMAT_UNKNOWN, "Unsupported pixel format");
+
    if( retTex->mProfile->isDynamic() )
    {
-      usage = D3D11_USAGE_DYNAMIC;
-	  cpuAccess |= D3D11_CPU_ACCESS_WRITE;
+      //d3d11 seems to not allow mipmaped dynamic textures.
+      if(numMipLevels == 1)
+      {
+         usage = D3D11_USAGE_DYNAMIC;
+         cpuAccess |= D3D11_CPU_ACCESS_WRITE;
+      }
    }
 
    if( retTex->mProfile->isRenderTarget() )
    {
-     bind |= D3D11_BIND_DEPTH_STENCIL;
+      bind |= D3D11_BIND_DEPTH_STENCIL;
    }
 
    if(retTex->mProfile->isZTarget())
@@ -109,9 +115,9 @@ void GFXD3D11TextureManager::_innerCreateTexture( GFXD3D11TextureObject *retTex,
        numMipLevels == 0 &&
        !(depth > 0) )
    {
-	   //TODO. Call  ID3D11DeviceContext::GenerateMips. d3d9 did it automatically.
+      //TODO. Call  ID3D11DeviceContext::GenerateMips. d3d9 did it automatically.
       misc |= D3D11_RESOURCE_MISC_GENERATE_MIPS;
-	  bind |= D3D11_BIND_RENDER_TARGET;
+      bind |= D3D11_BIND_RENDER_TARGET;
    }
 
    // Set the managed flag...
@@ -119,76 +125,74 @@ void GFXD3D11TextureManager::_innerCreateTexture( GFXD3D11TextureObject *retTex,
    
    if( depth > 0 )
    {
+      D3D11_TEXTURE3D_DESC sTexDesc3D;
+      sTexDesc3D.Width				= width;
+      sTexDesc3D.Height				= height;
+      sTexDesc3D.Depth				= depth;
+      sTexDesc3D.MipLevels			= numMipLevels;
+      sTexDesc3D.Format				= d3dTextureFormat;
+      sTexDesc3D.Usage				= usage;
+      sTexDesc3D.BindFlags			= bind;
+      sTexDesc3D.CPUAccessFlags		= cpuAccess;
+      sTexDesc3D.MiscFlags			= misc;
 
-	D3D11_TEXTURE3D_DESC sTexDesc3D;
-	sTexDesc3D.Width				= width;
-	sTexDesc3D.Height				= height;
-	sTexDesc3D.Depth				= depth;
-	sTexDesc3D.MipLevels			= numMipLevels;
-	sTexDesc3D.Format				= d3dTextureFormat;
-	sTexDesc3D.Usage				= usage;
-	sTexDesc3D.BindFlags			= bind;
-	sTexDesc3D.CPUAccessFlags		= cpuAccess;
-	sTexDesc3D.MiscFlags			= misc;
+      ID3D11Texture3D* tex3D;
+      HRESULT hResult = mD3DDevice->CreateTexture3D(&sTexDesc3D, NULL, &tex3D);
 
-	ID3D11Texture3D* tex3D;
-	HRESULT hResult = mD3DDevice->CreateTexture3D(&sTexDesc3D, NULL, &tex3D);
+      D3D11Assert(hResult, "GFXD3D11TextureManager::_createTexture - failed to create volume texture!");
 
-      D3D11Assert(hResult == S_OK, "GFXD3D11TextureManager::_createTexture - failed to create volume texture!");
-
-	  retTex->setTex(tex3D);
+      retTex->setTex(tex3D);
       retTex->mTextureSize.set( width, height, depth );
       retTex->mMipLevels = numMipLevels;
       // required for 3D texture support - John Kabus
-	  retTex->mFormat = format;
+      retTex->mFormat = format;
    }
    else
    {
-
-	D3D11_TEXTURE2D_DESC sTexDesc2D;
-	sTexDesc2D.Width				= width;
-	sTexDesc2D.Height				= height;
-	sTexDesc2D.MipLevels			= numMipLevels;
-	sTexDesc2D.ArraySize			= 1;
-	sTexDesc2D.Format				= d3dTextureFormat;
-	sTexDesc2D.Usage				= usage;
-	sTexDesc2D.BindFlags			= bind;
-	sTexDesc2D.CPUAccessFlags		= cpuAccess;;
-	sTexDesc2D.MiscFlags			= misc;
+      D3D11_TEXTURE2D_DESC sTexDesc2D;
+      sTexDesc2D.Width				= width;
+      sTexDesc2D.Height				= height;
+      sTexDesc2D.MipLevels			= numMipLevels;
+      sTexDesc2D.ArraySize			= 1;
+      sTexDesc2D.Format				= d3dTextureFormat;
+      sTexDesc2D.Usage				= usage;
+      sTexDesc2D.BindFlags			= bind;
+      sTexDesc2D.CPUAccessFlags		= cpuAccess;
+      sTexDesc2D.MiscFlags			= misc;
 
       // Figure out AA settings for depth and render targets
       switch (antialiasLevel)
       {
          case 0:
-			 sTexDesc2D.SampleDesc.Quality = 0;
-			sTexDesc2D.SampleDesc.Count = 1;
+            sTexDesc2D.SampleDesc.Quality = 0;
+            sTexDesc2D.SampleDesc.Count = 1;
             break;
          case AA_MATCH_BACKBUFFER :
-			 sTexDesc2D.SampleDesc = d3d->getMultisampleInfo();
+            sTexDesc2D.SampleDesc = d3d->getMultisampleInfo();
             break;
          default :
-            {
+         {
                sTexDesc2D.SampleDesc.Quality = 0;
                sTexDesc2D.SampleDesc.Count = antialiasLevel;
 #ifdef TORQUE_DEBUG
-			   UINT numQualityLevels;
-			   mD3DDevice->CheckMultisampleQualityLevels(d3dTextureFormat, antialiasLevel, &numQualityLevels);
-			   AssertFatal(numQualityLevels, "Invalid AA level!");
+               UINT numQualityLevels;
+               mD3DDevice->CheckMultisampleQualityLevels(d3dTextureFormat, antialiasLevel, &numQualityLevels);
+               AssertFatal(numQualityLevels, "Invalid AA level!");
 #endif
-            }
-            break;
+               break;
+         }
       }
 
-	  ID3D11Texture2D* tex2D;
+      ID3D11Texture2D* tex2D;
 
-	  HRESULT hResult = mD3DDevice->CreateTexture2D(&sTexDesc2D, NULL, &tex2D);
+      HRESULT hResult = mD3DDevice->CreateTexture2D(&sTexDesc2D, NULL, &tex2D);
 
-	  D3D11Assert(hResult == S_OK, "Failed to create texture");
+      D3D11Assert(hResult, "Failed to create texture");
 
-	  retTex->setTex(tex2D);
-	  retTex->mFormat = format;
-	  retTex->mMipLevels = numMipLevels;
-	  retTex->mTextureSize.set(width, height, depth);
+      retTex->setTex(tex2D);
+      retTex->mFormat = format;
+      retTex->mMipLevels = numMipLevels;
+      retTex->mTextureSize.set(width, height, depth);
    }
 }
 
@@ -250,83 +254,46 @@ bool GFXD3D11TextureManager::_loadTexture(GFXTextureObject *aTexture, GBitmap *p
       nbMipMapLevel  = aTexture->mMipLevels;
    }
 
-   AssertFatal(0, "Not implmented");
-
-#if 0
    // Fill the texture...
    for( int i = 0; i < maxDownloadMip; i++ )
    {
-      LPDIRECT3DSURFACE9 surf = NULL;
-      D3D11Assert(texture->get2DTex()->GetSurfaceLevel( i, &surf ), "Failed to get surface");
+      U32 subresource = D3D11CalcSubresource(i, 0, aTexture->mMipLevels);
+      //D3D11_MAPPED_SUBRESOURCE* mapping;
+      //dev->getDeviceContext()->Map(texture->get2DTex(), subresource, D3D11_MAP_WRITE, 0, mapping);
 
-      D3DLOCKED_RECT lockedRect;
-
-      U32 waterMark = 0;
-      if (!dev->isD3D11Ex())
-         surf->LockRect( &lockedRect, NULL, 0 );
-      else
-      {
-         waterMark = FrameAllocator::getWaterMark();
-         lockedRect.pBits = static_cast<void*>(FrameAllocator::alloc(pDL->getWidth(i) * pDL->getHeight(i) * pDL->getBytesPerPixel()));
-      }
-      
       switch( texture->mFormat )
       {
-      case GFXFormatR8G8B8:
+         case GFXFormatR8G8B8:
          {
             PROFILE_SCOPE(Swizzle24_Upload);
             AssertFatal( pDL->getFormat() == GFXFormatR8G8B8, "Assumption failed" );
-            GFX->getDeviceSwizzle24()->ToBuffer( lockedRect.pBits, pDL->getBits(i), 
-               pDL->getWidth(i) * pDL->getHeight(i) * pDL->getBytesPerPixel() );
-         }
-         break;
 
-      case GFXFormatR8G8B8A8:
-      case GFXFormatR8G8B8X8:
+            //Not supported by d3d11, convert to RGBX and fall through to the next case
+            pDL->setFormat(GFXFormatR8G8B8X8);
+         }
+         case GFXFormatR8G8B8A8:
+         case GFXFormatR8G8B8X8:
          {
             PROFILE_SCOPE(Swizzle32_Upload);
-            GFX->getDeviceSwizzle32()->ToBuffer( lockedRect.pBits, pDL->getBits(i), 
-               pDL->getWidth(i) * pDL->getHeight(i) * pDL->getBytesPerPixel() );
-         }
-         break;
 
-      default:
+            void* pData = static_cast<void*>(FrameAllocator::alloc(pDL->getWidth(i) * pDL->getHeight(i) * pDL->getBytesPerPixel()));
+               GFX->getDeviceSwizzle32()->ToBuffer( pData, pDL->getBits(i), 
+                  pDL->getWidth(i) * pDL->getHeight(i) * pDL->getBytesPerPixel() );
+            dev->getDeviceContext()->UpdateSubresource(texture->get2DTex(), subresource, 0, pData, pDL->getWidth(i), 0);
+            break;
+         }
+
+         default:
          {
             // Just copy the bits in no swizzle or padding
             PROFILE_SCOPE(SwizzleNull_Upload);
             AssertFatal( pDL->getFormat() == texture->mFormat, "Format mismatch" );
-            dMemcpy( lockedRect.pBits, pDL->getBits(i), 
-               pDL->getWidth(i) * pDL->getHeight(i) * pDL->getBytesPerPixel() );
+            dev->getDeviceContext()->UpdateSubresource(texture->get2DTex(), subresource, 0, pDL->getBits(i), pDL->getWidth(i), 0);
          }
       }
 
-#ifdef TORQUE_OS_XENON
-      RECT srcRect;
-      srcRect.bottom = pDL->getHeight(i);
-      srcRect.top = 0;
-      srcRect.left = 0;
-      srcRect.right = pDL->getWidth(i);
-
-      D3DXLoadSurfaceFromMemory(surf, NULL, NULL, ~swizzleMem, (D3DFORMAT)MAKELINFMT(GFXD3D11TextureFormat[pDL->getFormat()]),
-         pDL->getWidth(i) * pDL->getBytesPerPixel(), NULL, &srcRect, false, 0, 0, D3DX_FILTER_NONE, 0);
-#else
-      if (!dev->isD3D11Ex())
-         surf->UnlockRect();
-      else
-      {
-         RECT srcRect;
-         srcRect.top = 0;
-         srcRect.left = 0;
-         srcRect.right = pDL->getWidth(i);
-         srcRect.bottom = pDL->getHeight(i);
-         D3DXLoadSurfaceFromMemory(surf, NULL, NULL, lockedRect.pBits, GFXD3D11TextureFormat[pDL->getFormat()], pDL->getBytesPerPixel() * pDL->getWidth(i), NULL, &srcRect, D3DX_DEFAULT, 0);
-         FrameAllocator::setWaterMark(waterMark);
-      }
-#endif
-      
-      surf->Release();
+	  //dev->getDeviceContext()->Unmap(texture->get2DTex(), subresource);
    }
-#endif
 
    return true;
 }
@@ -360,7 +327,7 @@ bool GFXD3D11TextureManager::_loadTexture( GFXTextureObject *inTex, void *raw )
    U32 rowPitch = texture->getWidth() * bytesPerPix;
    U32 slicePitch = texture->getWidth() * texture->getHeight() * bytesPerPix;
 
-	AssertFatal(0, "Not implmented");
+   AssertFatal(0, "Not implmented");
 
 #if 0
 

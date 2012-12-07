@@ -98,7 +98,7 @@ GFXLockedRect *GFXD3D11TextureObject::lock(U32 mipLevel /*= 0*/, RectI *inRect /
 
 	HRESULT hResult = mD3DDevice->getDeviceContext()->Map(mD3DTexture, mLockedSubresource, D3D11_MAP_WRITE, 0, &mapInfo);
 
-      D3D11Assert(hResult == S_OK, 
+      D3D11Assert(hResult, 
          "GFXD3D11TextureObject::lock - could not lock non-RT texture!" );
       mLocked = true;
    }

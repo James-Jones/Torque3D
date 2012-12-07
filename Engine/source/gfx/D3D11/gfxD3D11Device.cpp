@@ -748,9 +748,10 @@ GFXD3D11VertexBuffer * GFXD3D11Device::createVBPool( const GFXVertexFormat *vert
    D3D11_BUFFER_DESC bufferDesc;
    bufferDesc.ByteWidth       = vertSize * MAX_DYNAMIC_VERTS;
    bufferDesc.BindFlags       = D3D11_BIND_VERTEX_BUFFER;
-   bufferDesc.CPUAccessFlags  = 0;
+   bufferDesc.CPUAccessFlags  = D3D11_CPU_ACCESS_WRITE;
    bufferDesc.MiscFlags       = 0;
    bufferDesc.Usage = D3D11_USAGE_DYNAMIC;
+   bufferDesc.StructureByteStride = vertSize;
    D3D11Assert(mD3DDevice->CreateBuffer( &bufferDesc, NULL, &newBuff->vb ), "Failed to allocate dynamic VB");
 
    return newBuff;
