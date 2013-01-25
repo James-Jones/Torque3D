@@ -126,7 +126,7 @@ protected:
    PlatformWindow *mWindow;
 public:
    GFXWindowTarget() : mWindow(NULL){};
-   GFXWindowTarget( PlatformWindow *windowObject )
+   explicit GFXWindowTarget( PlatformWindow *windowObject )
    {
       mWindow = windowObject;
    }

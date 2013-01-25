@@ -63,9 +63,17 @@ inline void D3D11Assert( HRESULT hr, const char *info )
 
 class GFXD3D11WindowTarget : public GFXWindowTarget
 {
+protected:
+    IDXGISwapChain* mSwapChain;
 public:
+
+   explicit GFXD3D11WindowTarget(IDXGISwapChain* sc) : GFXWindowTarget(), mSwapChain(sc)
+   {
+   }
+
    virtual bool present()
    {
+      mSwapChain->Present(0, 0);
       return true;
    }
 

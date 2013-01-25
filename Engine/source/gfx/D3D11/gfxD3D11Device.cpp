@@ -739,7 +739,7 @@ GFXWindowTarget *GFXD3D11Device::allocWindowTarget(PlatformWindow *window)
    {
       init(window->getVideoMode(), window);
    }
-   return new GFXD3D11WindowTarget();
+   return new GFXD3D11WindowTarget(mSwapChain);
 };
 
 GFXStateBlockRef GFXD3D11Device::createStateBlockInternal(const GFXStateBlockDesc& desc)
@@ -1152,10 +1152,10 @@ void GFXD3D11Device::clear( U32 flags, ColorI color, F32 z, U32 stencil )
    // Make sure we have flushed our render target state.
    _updateRenderTargets();
 
-   float ClearColor[4] = { 1/256 * color.red,
-       1/256 * color.green,
-       1/256 * color.blue,
-       1/256 * color.alpha };
+   float ClearColor[4] = { 1.0f/256.0f * color.red,
+       1.0f/256.0f * color.green,
+       1.0f/256.0f * color.blue,
+       1.0f/256.0f * color.alpha };
 
    if( flags & GFXClearTarget )
       mImmediateContext->ClearRenderTargetView(mRenderTargetView, ClearColor);
