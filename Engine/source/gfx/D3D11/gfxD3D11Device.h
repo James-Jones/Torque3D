@@ -138,6 +138,22 @@ protected:
 
    static GFXAdapter::CreateDeviceInstanceDelegate mCreateDeviceInstance; 
 
+   class D3D11VertexDecl : public GFXVertexDecl
+   {
+   public:
+      virtual ~D3D11VertexDecl()
+      {
+         SAFE_RELEASE( decl );
+      }
+
+      ID3D11InputLayout *decl;
+   };
+
+   /// Used to lookup a vertex declaration for the vertex format.
+   /// @see allocVertexDecl
+   typedef Map<String,D3D11VertexDecl*> VertexDeclMap;
+   VertexDeclMap mVertexDecls;
+
    /// Called by GFXDevice to create a device specific stateblock
    virtual GFXStateBlockRef createStateBlockInternal(const GFXStateBlockDesc& desc);
    /// Called by GFXDevice to actually set a stateblock.
@@ -163,10 +179,10 @@ protected:
    virtual void setMatrix( GFXMatrixType mtype, const MatrixF &mat ) { };
 
 
-   virtual GFXVertexDecl* allocVertexDecl( const GFXVertexFormat *vertexFormat ) { return NULL; }
-   virtual void setVertexDecl( const GFXVertexDecl *decl ) {  }
-   virtual void setVertexStream( U32 stream, GFXVertexBuffer *buffer ) { }
-   virtual void setVertexStreamFrequency( U32 stream, U32 frequency ) { }
+   virtual GFXVertexDecl* allocVertexDecl( const GFXVertexFormat *vertexFormat );
+   virtual void setVertexDecl( const GFXVertexDecl *decl );
+   virtual void setVertexStream( U32 stream, GFXVertexBuffer *buffer );
+   virtual void setVertexStreamFrequency( U32 stream, U32 frequency );
 
    virtual void _setPrimitiveBuffer( GFXPrimitiveBuffer *buffer );
 

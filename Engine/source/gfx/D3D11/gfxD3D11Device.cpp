@@ -899,6 +899,108 @@ void GFXD3D11Device::setShader( GFXShader *shader )
    }
 }
 
+GFXVertexDecl* GFXD3D11Device::allocVertexDecl( const GFXVertexFormat *vertexFormat )
+{
+   // First check the map... you shouldn't allocate VBs very often
+   // if you want performance.  The map lookup should never become
+   // a performance bottleneck.
+   D3D11VertexDecl *decl = mVertexDecls[vertexFormat->getDescription()];
+   if ( decl )
+      return decl;
+
+   // Setup the declaration struct.
+   U32 elemCount = vertexFormat->getElementCount();
+   U32 offset = 0;
+   D3D11_INPUT_ELEMENT_DESC *ie = new D3D11_INPUT_ELEMENT_DESC[ elemCount + 1 ];
+
+   for ( U32 i=0; i < elemCount; i++ )
+   {
+      const GFXVertexElement &element = vertexFormat->getElement( i );
+      
+      AssertWarn(element.getStreamIndex()==0, "Non-zero stream with d3d11 not implemented" );
+
+      ie[i].AlignedByteOffset = offset;
+      offset += element.getSizeInBytes();
+
+      ie[i].InputSlot = 0;
+      ie[i].InputSlotClass = D3D11_INPUT_PER_VERTEX_DATA;
+      ie[i].InstanceDataStepRate = 0;
+
+      switch(element.getType())
+      {
+         case GFXDeclType_Float:
+         {
+            ie[i].Format = DXGI_FORMAT_R32_FLOAT;
+            break;
+         }
+         case GFXDeclType_Float2:
+         {
+            ie[i].Format = DXGI_FORMAT_R32G32_FLOAT;
+            break;
+         }
+         case GFXDeclType_Float3:
+         {
+            ie[i].Format = DXGI_FORMAT_R32G32B32_FLOAT;
+            break;
+         }
+         case GFXDeclType_Color:
+         {
+             ie[i].Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+             break;
+         }
+         case GFXDeclType_Float4:
+         default:
+         {
+            ie[i].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+            break;
+         }
+      }
+
+      ie[i].SemanticIndex = 0;
+      if ( element.isSemantic( GFXSemantic::POSITION ) )
+         ie[i].SemanticName = "POSITION";
+      else if ( element.isSemantic( GFXSemantic::NORMAL ) )
+         ie[i].SemanticName = "NORMAL";
+      else if ( element.isSemantic( GFXSemantic::COLOR ) )
+         ie[i].SemanticName = "COLOR";
+      else if ( element.isSemantic( GFXSemantic::TANGENT ) )
+         ie[i].SemanticName = "TANGENT";
+      else if ( element.isSemantic( GFXSemantic::BINORMAL ) )
+         ie[i].SemanticName = "BINORMAL";
+      else
+      {
+         // Anything that falls thru to here will be a texture coord.
+         ie[i].SemanticName = "TEXCOORD";
+         ie[i].SemanticIndex = element.getSemanticIndex();
+      }
+   }
+
+   decl = new D3D11VertexDecl();
+
+   //D3D11Assert(mD3DDevice->CreateInputLayout(ie, elemCount, 0, 0, &decl->decl), "Failed to create input layout!");
+
+   delete [] ie;
+
+   mVertexDecls[vertexFormat->getDescription()] = decl;
+
+   return decl;
+}
+void GFXD3D11Device::setVertexDecl( const GFXVertexDecl *decl )
+{
+   ID3D11InputLayout *dx11Decl = NULL;
+   if ( decl )
+      dx11Decl = static_cast<const D3D11VertexDecl*>( decl )->decl;
+   //mImmediateContext->IASetInputLayout(dx11Decl);
+}
+void GFXD3D11Device::setVertexStream( U32 stream, GFXVertexBuffer *buffer )
+{
+
+}
+void GFXD3D11Device::setVertexStreamFrequency( U32 stream, U32 frequency )
+{
+
+}
+
 //
 // Register this device with GFXInit
 //
