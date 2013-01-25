@@ -700,6 +700,10 @@ void GFXD3D11Device::init( const GFXVideoMode &mode, PlatformWindow *window )
    mCardProfiler->init();
 
    mTextureManager = new GFXD3D11TextureManager(mD3DDevice);
+
+   mInitialized = true;
+
+   deviceInited();
 }
 
 GFXWindowTarget *GFXD3D11Device::allocWindowTarget(PlatformWindow *window)
