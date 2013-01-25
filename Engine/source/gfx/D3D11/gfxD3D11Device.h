@@ -120,9 +120,11 @@ protected:
    ID3D11Device *mD3DDevice;
    IDXGISwapChain *mSwapChain;
    ID3D11RenderTargetView *mRenderTargetView;
+   ID3D11DepthStencilView *mDepthStencilView;
    ID3D11DeviceContext *mImmediateContext;
    D3D_FEATURE_LEVEL mFeatureLevel;
    ID3D11Texture2D *mBackBuffer;
+   ID3D11Texture2D *mDepthStencilTex;
    DXGI_SAMPLE_DESC mMultisampleInfo;
    F32 mPixVersion;
    U32 mNumRenderTargets;
@@ -153,6 +155,11 @@ protected:
    /// @see allocVertexDecl
    typedef Map<String,D3D11VertexDecl*> VertexDeclMap;
    VertexDeclMap mVertexDecls;
+
+   GFXShaderRef mGenericShader[GS_COUNT];
+
+   MatrixF mTempMatrix;    ///< Temporary matrix, no assurances on value at all
+   RectI mClipRect;
 
    /// Called by GFXDevice to create a device specific stateblock
    virtual GFXStateBlockRef createStateBlockInternal(const GFXStateBlockDesc& desc);
@@ -205,7 +212,7 @@ public:
    virtual GFXTextureTarget *allocRenderToTextureTarget(){return NULL;};
    virtual GFXWindowTarget *allocWindowTarget(PlatformWindow *window);
 
-   virtual void _updateRenderTargets(){};
+   virtual void _updateRenderTargets();
 
    virtual F32 getPixelShaderVersion() const { return mPixVersion; };
    virtual void setPixelShaderVersion( F32 version ) { mPixVersion = version;};
@@ -215,8 +222,10 @@ public:
 
    virtual GFXShader* createShader();
 
+   virtual void setupGenericShaders( GenericShaderType type  = GSColor );
 
-   virtual void clear( U32 flags, ColorI color, F32 z, U32 stencil ) { };
+
+   virtual void clear( U32 flags, ColorI color, F32 z, U32 stencil );
    virtual bool beginSceneInternal() { mCanCurrentlyRender = true; return true; };
    virtual void endSceneInternal() { mCanCurrentlyRender = false; };
 
@@ -228,7 +237,7 @@ public:
                                        U32 startIndex, 
                                        U32 primitiveCount );
 
-   virtual void setClipRect( const RectI &rect ) { };
+   virtual void setClipRect( const RectI &rect );
    virtual const RectI &getClipRect() const { return clip; };
 
    virtual void preDestroy() { Parent::preDestroy(); };

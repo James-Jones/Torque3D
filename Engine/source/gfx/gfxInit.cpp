@@ -287,7 +287,10 @@ GFXAdapter *GFXInit::getBestAdapterChoice()
 
    // Return best found in order DX11, DX9, GL, DX8.
    if(foundAdapter11)
-      Con::warnf( "GFXInit::getBestAdapterChoice - Ignoring D3D11 until it is supported" );
+   {
+      Con::warnf( "GFXInit::getBestAdapterChoice - D3D11 support is incomplete" );
+	  return foundAdapter11;
+   }
 
    if(foundAdapter9)
       return foundAdapter9;
@@ -402,7 +405,7 @@ DefineEngineStaticMethod( GFXInit, getAdapterName, String, ( S32 index ),,
 }
 
 DefineEngineStaticMethod( GFXInit, getAdapterType, GFXAdapterType, ( S32 index ),,
-   "Returns the type (D3D9, D3D8, GL, Null) of a graphics adapter.\n"
+   "Returns the type (D3D11, D3D9, D3D8, GL, Null) of a graphics adapter.\n"
    "@param index The index of the adapter." )
 {
    Vector<GFXAdapter*> adapters( __FILE__, __LINE__ );

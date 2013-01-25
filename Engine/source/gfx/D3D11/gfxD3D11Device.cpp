@@ -659,7 +659,33 @@ void GFXD3D11Device::init( const GFXVideoMode &mode, PlatformWindow *window )
 
    mSwapChain->GetBuffer(0, __uuidof( ID3D11Texture2D ), (LPVOID*)&(mBackBuffer)) ;
    mD3DDevice->CreateRenderTargetView( mBackBuffer, NULL, &mRenderTargetView );
-   mImmediateContext->OMSetRenderTargets(1, &mRenderTargetView, NULL );
+
+   // Create depth stencil texture
+   D3D11_TEXTURE2D_DESC descDepth;
+   ZeroMemory( &descDepth, sizeof(descDepth) );
+   descDepth.Width = mode.resolution.x;
+   descDepth.Height = mode.resolution.y;
+   descDepth.MipLevels = 1;
+   descDepth.ArraySize = 1;
+   descDepth.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+   descDepth.SampleDesc.Count = 1;
+   descDepth.SampleDesc.Quality = 0;
+   descDepth.Usage = D3D11_USAGE_DEFAULT;
+   descDepth.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+   descDepth.CPUAccessFlags = 0;
+   descDepth.MiscFlags = 0;
+
+   D3D11Assert(mD3DDevice->CreateTexture2D( &descDepth, NULL, &mDepthStencilTex ), "Failed to create depth/stencil texture");
+
+    // Create the depth stencil view
+   D3D11_DEPTH_STENCIL_VIEW_DESC descDSV;
+   ZeroMemory( &descDSV, sizeof(descDSV) );
+   descDSV.Format = descDepth.Format;
+   descDSV.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+   descDSV.Texture2D.MipSlice = 0;
+   D3D11Assert(mD3DDevice->CreateDepthStencilView( mDepthStencilTex, &descDSV, &mDepthStencilView ), "Failed to create depth/stencil view");
+
+   mImmediateContext->OMSetRenderTargets(1, &mRenderTargetView, mDepthStencilView );
 
    switch(mFeatureLevel)
    {
@@ -1000,6 +1026,149 @@ void GFXD3D11Device::setVertexStreamFrequency( U32 stream, U32 frequency )
 {
 
 }
+
+void GFXD3D11Device::setupGenericShaders( GenericShaderType type /* = GSColor */ )
+{
+   if( mGenericShader[GSColor] == NULL )
+   {
+       Vector<GFXShaderMacro> shaderMacros;
+       mGenericShader[GSColor] = createShader();
+
+       mGenericShader[GSColor]->init("shaders/common/fixedFunction/colorV.hlsl", 
+         "shaders/common/fixedFunction/colorP.hlsl", 
+         2.f, shaderMacros);
+
+       mGenericShader[GSModColorTexture] = createShader();
+       mGenericShader[GSModColorTexture]->init("shaders/common/fixedFunction/modColorTextureV.hlsl", 
+         "shaders/common/fixedFunction/modColorTextureP.hlsl", 
+         2.f, shaderMacros);
+
+       mGenericShader[GSAddColorTexture] = createShader();
+       mGenericShader[GSAddColorTexture]->init("shaders/common/fixedFunction/addColorTextureV.hlsl", 
+         "shaders/common/fixedFunction/addColorTextureP.hlsl", 
+         2.f, shaderMacros);
+   }
+
+   //mGenericShader[type]->process();
+
+   MatrixF world, view, proj;
+   mWorldMatrix[mWorldStackSize].transposeTo( world );
+   mViewMatrix.transposeTo( view );
+   mProjectionMatrix.transposeTo( proj );
+
+   mTempMatrix = world * view * proj;
+
+   //setVertexShaderConstF( VC_WORLD_PROJ, (F32 *)&mTempMatrix, 4 );
+}
+
+void GFXD3D11Device::setClipRect( const RectI &inRect ) 
+{
+	// We transform the incoming rect by the view 
+   // matrix first, so that it can be used to pan
+   // and scale the clip rect.
+   //
+   // This is currently used to take tiled screenshots.
+   Point3F pos( inRect.point.x, inRect.point.y, 0.0f );
+   Point3F extent( inRect.extent.x, inRect.extent.y, 0.0f );
+   getViewMatrix().mulP( pos );
+   getViewMatrix().mulV( extent );  
+   RectI rect( pos.x, pos.y, extent.x, extent.y );
+
+   // Clip the rect against the renderable size.
+   Point2I size = mCurrentRT->getSize();
+
+   RectI maxRect(Point2I(0,0), size);
+   rect.intersect(maxRect);
+
+   mClipRect = rect;
+
+   F32 l = F32( mClipRect.point.x );
+   F32 r = F32( mClipRect.point.x + mClipRect.extent.x );
+   F32 b = F32( mClipRect.point.y + mClipRect.extent.y );
+   F32 t = F32( mClipRect.point.y );
+
+   // Set up projection matrix, 
+   static Point4F pt;   
+   pt.set(2.0f / (r - l), 0.0f, 0.0f, 0.0f);
+   mTempMatrix.setColumn(0, pt);
+
+   pt.set(0.0f, 2.0f/(t - b), 0.0f, 0.0f);
+   mTempMatrix.setColumn(1, pt);
+
+   pt.set(0.0f, 0.0f, 1.0f, 0.0f);
+   mTempMatrix.setColumn(2, pt);
+
+   pt.set((l+r)/(l-r), (t+b)/(b-t), 1.0f, 1.0f);
+   mTempMatrix.setColumn(3, pt);
+
+   setProjectionMatrix( mTempMatrix );
+
+   // Set up world/view matrix
+   mTempMatrix.identity();   
+   setWorldMatrix( mTempMatrix );
+
+   setViewport( mClipRect );
+}
+
+void GFXD3D11Device::_updateRenderTargets()
+{
+   if ( mRTDirty || ( mCurrentRT && mCurrentRT->isPendingState() ) )
+   {
+      if ( mRTDeactivate )
+      {
+         mRTDeactivate->deactivate();
+         mRTDeactivate = NULL;   
+      }
+
+      // NOTE: The render target changes are not really accurate
+      // as the GFXTextureTarget supports MRT internally.  So when
+      // we activate a GFXTarget it could result in multiple calls
+      // to SetRenderTarget on the actual device.
+      mDeviceStatistics.mRenderTargetChanges++;
+
+      mCurrentRT->activate();
+
+      mRTDirty = false;
+   }  
+
+   if ( mViewportDirty )
+   {
+      D3D11_VIEWPORT vp;
+      vp.Width = mViewport.extent.x;
+      vp.Height = mViewport.extent.y;
+      vp.MinDepth = 0.0f;
+      vp.MaxDepth = 1.0f;
+      vp.TopLeftX = mViewport.point.x;
+      vp.TopLeftY = mViewport.point.y;
+
+      mImmediateContext->RSSetViewports(1, &vp);
+
+      mViewportDirty = false;
+   }
+}
+
+void GFXD3D11Device::clear( U32 flags, ColorI color, F32 z, U32 stencil )
+{
+   // Make sure we have flushed our render target state.
+   _updateRenderTargets();
+
+   float ClearColor[4] = { 1/256 * color.red,
+       1/256 * color.green,
+       1/256 * color.blue,
+       1/256 * color.alpha };
+
+   if( flags & GFXClearTarget )
+      mImmediateContext->ClearRenderTargetView(mRenderTargetView, ClearColor);
+
+   U32 zsClear = 0;
+
+   if( flags & GFXClearZBuffer)
+       zsClear |= D3D11_CLEAR_DEPTH;
+   if( flags & GFXClearStencil)
+       zsClear |= D3D11_CLEAR_STENCIL;
+
+    mImmediateContext->ClearDepthStencilView(mDepthStencilView, zsClear, z, stencil);
+};
 
 //
 // Register this device with GFXInit
